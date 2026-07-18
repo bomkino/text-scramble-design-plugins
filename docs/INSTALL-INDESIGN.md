@@ -20,4 +20,4 @@ This companion uses InDesign’s classic ExtendScript runtime for immediate loca
 3. Click **Load**.
 4. In InDesign 18.5 or newer, open **Plugins → Text Scramble**.
 
-Adobe UXP Developer Tool is also used to package the panel as a signed `.ccx` for distribution. The release ZIP is a loadable developer build, not a signed Marketplace package.
+Adobe UXP Developer Tool is also used to package the panel as a `.ccx` for distribution. The release ZIP is a loadable developer build, not a Marketplace package; Marketplace packaging must use the plugin ID assigned by Adobe Developer Distribution.

@@ -14,8 +14,9 @@ Before submission:
 Before submission:
 
 1. Load and test the UXP panel in current stable InDesign with Adobe UXP Developer Tool.
-2. Package and sign a `.ccx` through Adobe’s developer tooling.
-3. Prepare Marketplace icons, screenshots, description, support URL, privacy statement, and test notes.
-4. Submit through Adobe Developer Distribution.
+2. Create the Marketplace listing in Adobe Developer Distribution and copy its unique plugin ID into `plugins/indesign/manifest.json`.
+3. Rebuild, retest, and package the registered build as a `.ccx` with Adobe UXP Developer Tool.
+4. Prepare Marketplace icons, screenshots, description, support URL, privacy statement, and test notes.
+5. Upload the version and submit the listing for review through Adobe Developer Distribution.
 
 The standalone JSX companion can be distributed directly under the MIT license. A Marketplace submission should use the UXP panel as the primary product and retain the JSX file as a documented local fallback.
