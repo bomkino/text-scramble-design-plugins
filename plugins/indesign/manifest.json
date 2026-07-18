@@ -1,0 +1,32 @@
+{
+  "manifestVersion": 5,
+  "id": "dog.pitch.text-scramble.indesign",
+  "name": "Text Scramble",
+  "version": "1.0.0",
+  "main": "dist/index.html",
+  "host": {
+    "app": "ID",
+    "minVersion": "18.5.0"
+  },
+  "entrypoints": [
+    {
+      "type": "panel",
+      "id": "textScramblePanel",
+      "label": { "default": "Text Scramble" },
+      "minimumSize": { "width": 280, "height": 470 },
+      "preferredDockedSize": { "width": 320, "height": 570 },
+      "preferredFloatingSize": { "width": 360, "height": 590 },
+      "icons": [
+        { "width": 24, "height": 24, "path": "dist/icons/icon-24.png", "scale": [1, 2] }
+      ]
+    },
+    {
+      "type": "command",
+      "id": "scrambleSelection",
+      "label": { "default": "Scramble Selection" }
+    }
+  ],
+  "icons": [
+    { "width": 24, "height": 24, "path": "dist/icons/icon-24.png", "scale": [1, 2] }
+  ]
+}

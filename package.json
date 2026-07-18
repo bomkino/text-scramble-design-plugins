@@ -1,0 +1,33 @@
+{
+  "name": "text-scramble-design-plugins",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Shape-matched placeholder copy for Figma and Adobe InDesign.",
+  "author": "pitch.dog",
+  "license": "MIT",
+  "homepage": "https://github.com/bomkino/text-scramble-design-plugins#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bomkino/text-scramble-design-plugins.git"
+  },
+  "bugs": {
+    "url": "https://github.com/bomkino/text-scramble-design-plugins/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "verify": "npm run typecheck && npm test && npm run build && node scripts/verify-build.mjs",
+    "package": "npm run verify && node scripts/package.mjs"
+  },
+  "devDependencies": {
+    "@figma/plugin-typings": "latest",
+    "@types/node": "latest",
+    "esbuild": "latest",
+    "tsx": "latest",
+    "typescript": "latest"
+  }
+}

@@ -1,0 +1,8 @@
+node_modules/
+.DS_Store
+artifacts/
+.playwright-cli/
+output/
+Icon?
+!plugins/indesign/dist/icons/
+!plugins/indesign/dist/icons/**

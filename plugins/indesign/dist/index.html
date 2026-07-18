@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Text Scramble</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 14px;
+        background: var(--uxp-host-background-color, #29272b);
+        color: var(--uxp-host-text-color, #f3eff4);
+        font: 12px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      .frame {
+        padding: 17px;
+        border: 1px solid var(--uxp-host-border-color, #4a464c);
+        border-radius: 16px;
+        background: var(--uxp-host-widget-hover-background-color, #332f35);
+      }
+      header { display: flex; align-items: center; }
+      .mark {
+        position: relative;
+        width: 50px;
+        height: 50px;
+        margin-right: 12px;
+        flex: 0 0 50px;
+        border-radius: 14px;
+        background: #2e1d38;
+      }
+      .sheet {
+        position: absolute;
+        top: 9px;
+        right: 11px;
+        bottom: 9px;
+        left: 11px;
+        border-radius: 7px;
+        background: #fff4dd;
+        transform: rotate(-3deg);
+      }
+      .line { position: absolute; left: 7px; height: 4px; border-radius: 4px; background: #66566c; }
+      .line.one { top: 8px; width: 19px; }
+      .line.two { top: 17px; width: 13px; background: #a99fa7; }
+      .line.three { right: 7px; bottom: 4px; background: #ff6f61; }
+      .eyebrow { margin: 0 0 2px; color: #ff8073; font-size: 9px; font-weight: 700; letter-spacing: 1.4px; }
+      h1 {
+        margin: 0;
+        font-family: "Iowan Old Style", Georgia, serif;
+        font-size: 24px;
+        line-height: 1.05;
+        letter-spacing: -0.5px;
+      }
+      .lede { margin: 8px 0 0; color: var(--uxp-host-text-color-secondary, #bbb4bd); font-size: 11px; }
+      .divider { height: 1px; margin: 16px 0; background: var(--uxp-host-border-color, #4a464c); }
+      .section-label { display: block; margin-bottom: 8px; color: #a9a1ab; font-size: 9px; font-weight: 700; letter-spacing: 1.3px; }
+      .scope-grid { display: flex; }
+      .scope-option { position: relative; width: 50%; }
+      .scope-option:first-child { margin-right: 7px; }
+      .scope-option input { position: absolute; opacity: 0; }
+      .scope-option label {
+        display: block;
+        min-height: 70px;
+        padding: 10px;
+        border: 1px solid var(--uxp-host-border-color, #4a464c);
+        border-radius: 11px;
+        background: rgba(0, 0, 0, 0.08);
+      }
+      .scope-option input:checked + label { border-color: #ff7569; background: rgba(255, 111, 97, 0.1); }
+      .scope-title { display: block; margin-bottom: 3px; font-weight: 700; }
+      .scope-copy { display: block; color: var(--uxp-host-text-color-secondary, #bbb4bd); font-size: 10px; line-height: 1.35; }
+      .summary {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 8px;
+        padding: 8px 10px;
+        border-radius: 9px;
+        background: rgba(0, 0, 0, 0.11);
+        color: var(--uxp-host-text-color-secondary, #bbb4bd);
+      }
+      .summary strong { color: var(--uxp-host-text-color, #f3eff4); }
+      .option-row { display: flex; align-items: center; justify-content: space-between; }
+      .option-title { display: block; font-weight: 700; }
+      .option-copy { display: block; margin-top: 2px; color: var(--uxp-host-text-color-secondary, #bbb4bd); font-size: 10px; }
+      .switch { display: flex; align-items: center; margin-left: 14px; }
+      .switch input { width: 18px; height: 18px; accent-color: #ff6f61; }
+      .action {
+        width: 100%;
+        margin-top: 17px;
+        padding: 12px 14px;
+        border: 0;
+        border-radius: 11px;
+        background: #ff6f61;
+        color: #28172e;
+        font: inherit;
+        font-weight: 800;
+      }
+      .action:hover { background: #ff7d70; }
+      .action:disabled { opacity: 0.68; }
+      .note { margin: 10px 2px 0; color: var(--uxp-host-text-color-secondary, #bbb4bd); font-size: 9.5px; text-align: center; }
+      .note strong { color: var(--uxp-host-text-color, #f3eff4); }
+      .status {
+        min-height: 32px;
+        margin-top: 10px;
+        padding: 8px;
+        border-radius: 8px;
+        color: var(--uxp-host-text-color-secondary, #bbb4bd);
+        text-align: center;
+        opacity: 0;
+      }
+      .status.visible { opacity: 1; }
+      .status.success { background: rgba(73, 166, 109, 0.13); color: var(--uxp-host-text-color, #f3eff4); }
+      .status.error { background: rgba(255, 111, 97, 0.13); color: var(--uxp-host-text-color, #f3eff4); }
+    </style>
+  </head>
+  <body>
+    <main class="frame">
+      <header>
+        <div class="mark" aria-hidden="true">
+          <div class="sheet">
+            <i class="line one"></i><i class="line two"></i><i class="line three"></i>
+          </div>
+        </div>
+        <div>
+          <p class="eyebrow">PRIVATE · ON DEVICE</p>
+          <h1>Text Scramble</h1>
+          <p class="lede">Invented copy. Same composition.</p>
+        </div>
+      </header>
+
+      <div class="divider"></div>
+      <span class="section-label">SCRAMBLE</span>
+      <div class="scope-grid" role="radiogroup" aria-label="Scramble scope">
+        <div class="scope-option">
+          <input id="selection" name="scope" type="radio" value="selection" checked />
+          <label for="selection"><span class="scope-title">Selection</span><span class="scope-copy">Text, frames, groups, or table cells.</span></label>
+        </div>
+        <div class="scope-option">
+          <input id="page" name="scope" type="radio" value="page" />
+          <label for="page"><span class="scope-title">Active page</span><span class="scope-copy">Every visible, unlocked text frame.</span></label>
+        </div>
+      </div>
+
+      <div class="summary" aria-live="polite">
+        <span id="summary-copy">Open a document to begin</span>
+        <strong id="summary-count">—</strong>
+      </div>
+
+      <div class="divider"></div>
+      <div class="option-row">
+        <div><span class="option-title">Scramble numbers</span><span class="option-copy">Preserves digit count and script.</span></div>
+        <label class="switch" aria-label="Scramble numbers"><input id="numbers" type="checkbox" checked /></label>
+      </div>
+
+      <button class="action" id="scramble" type="button">Scramble with soul</button>
+      <p class="note"><strong>Formatting stays put.</strong> Character styles, paragraph styles, links, spacing, and line breaks remain intact.</p>
+      <div class="status" id="status" role="status" aria-live="polite"></div>
+    </main>
+    <script src="index.js"></script>
+  </body>
+</html>
