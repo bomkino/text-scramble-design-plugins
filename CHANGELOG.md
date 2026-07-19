@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.1 — 2026-07-19
+
+- Prevented punctuation-only and number-preserving selections from reporting a false success.
+- Prevented overlapping Figma runs and stale selection summaries.
+- Switched InDesign UXP undo transactions to the native UXP script language.
+- Preflighted InDesign character edits before mutation to avoid partially changed frames.
+- Corrected Adobe entrypoint metadata and Retina icon naming.
+- Added grouped text-frame traversal to the classic InDesign companion.
+- Made release versions and dependency ranges explicit and reproducible.
+
 ## 1.0.0 — 2026-07-18
 
 - Added Figma selection and current-page workflows.

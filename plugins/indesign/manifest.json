@@ -2,7 +2,7 @@
   "manifestVersion": 5,
   "id": "dog.pitch.text-scramble.indesign",
   "name": "Text Scramble",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "main": "dist/index.html",
   "host": {
     "app": "ID",
@@ -16,9 +16,7 @@
       "minimumSize": { "width": 280, "height": 470 },
       "preferredDockedSize": { "width": 320, "height": 570 },
       "preferredFloatingSize": { "width": 360, "height": 590 },
-      "icons": [
-        { "width": 24, "height": 24, "path": "dist/icons/icon-24.png", "scale": [1, 2] }
-      ]
+      "description": { "default": "Replace selected copy with shape-matched invented text" }
     },
     {
       "type": "command",
@@ -27,6 +25,6 @@
     }
   ],
   "icons": [
-    { "width": 24, "height": 24, "path": "dist/icons/icon-24.png", "scale": [1, 2] }
+    { "width": 24, "height": 24, "path": "dist/icons/icon.png", "scale": [1, 2] }
   ]
 }

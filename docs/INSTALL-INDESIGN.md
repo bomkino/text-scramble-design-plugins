@@ -6,7 +6,7 @@ Duplicate the document before scrambling it. Text Scramble never saves a documen
 
 1. In InDesign, choose **Window → Utilities → Scripts**.
 2. In the Scripts panel, right-click **User** and choose **Reveal in Finder**.
-3. Copy `Text-Scramble-InDesign-1.0.0.jsx` from the release artifacts into that folder. From the source tree, use `plugins/indesign/dist/Text Scramble.jsx`.
+3. Copy the versioned `Text-Scramble-InDesign-*.jsx` file from the release artifacts into that folder. From the source tree, use `plugins/indesign/dist/Text Scramble.jsx`.
 4. Restart InDesign if the script does not appear immediately.
 5. Select text or one or more text frames, then double-click **Text Scramble.jsx**.
 6. Choose **Selection** or **Active page** and run it.

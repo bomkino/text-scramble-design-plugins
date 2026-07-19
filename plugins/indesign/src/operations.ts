@@ -1,5 +1,5 @@
 import { buildReplacementRuns } from "../../../packages/core/src/replacement-runs";
-import { scrambleTexts } from "../../../packages/core/src/scramble-text";
+import { hasScramblableText, scrambleTexts } from "../../../packages/core/src/scramble-text";
 
 declare const require: (module: string) => any;
 
@@ -91,7 +91,7 @@ function activePage(): any | null {
   }
 }
 
-function collectTargets(scope: Scope): any[] {
+function collectTargets(scope: Scope, scrambleNumbers: boolean): any[] {
   if (!app.documents || app.documents.length === 0) return [];
   const candidates = scope === "selection"
     ? Array.from(app.selection || []).flatMap(collectFromItem)
@@ -109,7 +109,7 @@ function collectTargets(scope: Scope): any[] {
 
   return Array.from(unique.values()).filter((target) => {
     try {
-      return target.isValid !== false && typeof target.contents === "string" && target.contents.length > 0;
+      return target.isValid !== false && typeof target.contents === "string" && hasScramblableText(target.contents, { scrambleNumbers });
     } catch {
       return false;
     }
@@ -119,17 +119,19 @@ function collectTargets(scope: Scope): any[] {
 function replaceTargetPreservingStyles(target: any, source: string, output: string): void {
   const runs = buildReplacementRuns(source, output);
   const characters = target.characters;
-
-  for (let index = runs.length - 1; index >= 0; index--) {
-    const run = runs[index];
+  const edits = runs.map((run) => {
     const character = typeof characters.item === "function" ? characters.item(run.characterIndex) : characters[run.characterIndex];
     if (!character || character.isValid === false) throw new Error(`Cannot edit character ${run.characterIndex + 1}.`);
-    character.contents = run.replacement;
+    return { character, replacement: run.replacement };
+  });
+
+  for (let index = edits.length - 1; index >= 0; index--) {
+    edits[index].character.contents = edits[index].replacement;
   }
 }
 
 export function scrambleDocument(scope: Scope, scrambleNumbers: boolean): ScrambleResult {
-  const targets = collectTargets(scope);
+  const targets = collectTargets(scope, scrambleNumbers);
   const sources = targets.map((target) => String(target.contents));
   const outputs = scrambleTexts(sources, { scrambleNumbers });
   const result: ScrambleResult = { targets: 0, characters: 0, skipped: 0, errors: [] };
@@ -148,13 +150,13 @@ export function scrambleDocument(scope: Scope, scrambleNumbers: boolean): Scramb
   };
 
   if (targets.length) {
-    app.doScript(apply, ScriptLanguage.JAVASCRIPT, [], UndoModes.ENTIRE_SCRIPT, "Text Scramble");
+    app.doScript(apply, ScriptLanguage.UXPSCRIPT, [], UndoModes.ENTIRE_SCRIPT, "Text Scramble");
   }
   return result;
 }
 
-export function inspectScope(scope: Scope): { targets: number; characters: number } {
-  const targets = collectTargets(scope);
+export function inspectScope(scope: Scope, scrambleNumbers = true): { targets: number; characters: number } {
+  const targets = collectTargets(scope, scrambleNumbers);
   return {
     targets: targets.length,
     characters: targets.reduce((total, target) => total + Array.from(String(target.contents)).length, 0),

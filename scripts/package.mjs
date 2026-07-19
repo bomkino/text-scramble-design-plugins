@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const artifacts = path.join(root, "artifacts");
 const staging = path.join(artifacts, ".staging");
+const { version } = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
 await rm(artifacts, { recursive: true, force: true });
 await mkdir(staging, { recursive: true });
 
@@ -28,9 +29,9 @@ async function archive(source, output) {
 
 const figmaStage = await stage("Text Scramble - Figma", path.join(root, "plugins", "figma"), "INSTALL-FIGMA.md");
 const indesignStage = await stage("Text Scramble - InDesign", path.join(root, "plugins", "indesign"), "INSTALL-INDESIGN.md");
-const figmaZip = path.join(artifacts, "Text-Scramble-Figma-1.0.0.zip");
-const indesignZip = path.join(artifacts, "Text-Scramble-InDesign-1.0.0.zip");
-const indesignScript = path.join(artifacts, "Text-Scramble-InDesign-1.0.0.jsx");
+const figmaZip = path.join(artifacts, `Text-Scramble-Figma-${version}.zip`);
+const indesignZip = path.join(artifacts, `Text-Scramble-InDesign-${version}.zip`);
+const indesignScript = path.join(artifacts, `Text-Scramble-InDesign-${version}.jsx`);
 await archive(figmaStage, figmaZip);
 await archive(indesignStage, indesignZip);
 await cp(path.join(root, "plugins", "indesign", "dist", "Text Scramble.jsx"), indesignScript);

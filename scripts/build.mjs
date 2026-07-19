@@ -7,6 +7,7 @@ import { build } from "esbuild";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const figma = path.join(root, "plugins", "figma");
 const indesign = path.join(root, "plugins", "indesign");
+const projectPackage = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
 
 async function clean(directory) {
   await rm(directory, { recursive: true, force: true });
@@ -69,12 +70,12 @@ await cp(path.join(indesign, "src", "Text Scramble.jsx"), path.join(indesign, "d
 await cp(path.join(indesign, "src", "index.html"), path.join(indesign, "dist", "index.html"));
 await mkdir(path.join(indesign, "dist", "icons"), { recursive: true });
 await cp(path.join(root, "assets", "icon.svg"), path.join(indesign, "dist", "icons", "icon.svg"));
-await renderIcon(path.join(indesign, "dist", "icons", "icon-24.png"), 24);
-await renderIcon(path.join(indesign, "dist", "icons", "icon-48.png"), 48);
+await renderIcon(path.join(indesign, "dist", "icons", "icon.png"), 24);
+await renderIcon(path.join(indesign, "dist", "icons", "icon@2x.png"), 48);
 
 const figmaManifest = JSON.parse(await readFile(path.join(figma, "manifest.json"), "utf8"));
 const indesignManifest = JSON.parse(await readFile(path.join(indesign, "manifest.json"), "utf8"));
-await writeFile(path.join(figma, "dist", "build.json"), JSON.stringify({ name: figmaManifest.name, version: "1.0.0" }, null, 2) + "\n");
+await writeFile(path.join(figma, "dist", "build.json"), JSON.stringify({ name: figmaManifest.name, version: projectPackage.version }, null, 2) + "\n");
 await writeFile(path.join(indesign, "dist", "build.json"), JSON.stringify({ name: indesignManifest.name, version: indesignManifest.version }, null, 2) + "\n");
 
 console.log("Built Figma and InDesign plugins.");

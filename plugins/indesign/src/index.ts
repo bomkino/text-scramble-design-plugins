@@ -23,7 +23,7 @@ function refreshScope(): void {
   const summaryCount = byId<HTMLElement>("summary-count");
   if (!summaryCopy || !summaryCount) return;
   try {
-    const summary = inspectScope(currentScope());
+    const summary = inspectScope(currentScope(), byId<HTMLInputElement>("numbers")?.checked !== false);
     summaryCopy.textContent = summary.targets ? `${summary.characters.toLocaleString()} characters ready` : "No eligible text yet";
     summaryCount.textContent = `${summary.targets} ${summary.targets === 1 ? "frame" : "frames"}`;
   } catch (error) {
@@ -39,6 +39,7 @@ function bindPanel(): void {
   button.dataset.bound = "true";
 
   document.querySelectorAll<HTMLInputElement>('input[name="scope"]').forEach((input) => input.addEventListener("change", refreshScope));
+  byId<HTMLInputElement>("numbers")?.addEventListener("change", refreshScope);
   button.addEventListener("click", () => {
     button.disabled = true;
     button.textContent = "Shaping fresh language…";

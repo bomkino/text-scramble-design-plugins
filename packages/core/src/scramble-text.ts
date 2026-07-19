@@ -15,6 +15,12 @@ const TRIPLE_VOWEL_PATTERN = /[aeiou]{3}/;
 const TRIPLE_CONSONANT_PATTERN = /[^aeiou]{3}/;
 const REPEATED_BIGRAM_PATTERN = /([a-z]{2})\1/;
 
+export function hasScramblableText(input: string, options: Pick<ScrambleOptions, "scrambleNumbers"> = {}): boolean {
+  return Array.from(input).some(
+    (char) => LETTER_CHARACTER_PATTERN.test(char) || (options.scrambleNumbers !== false && DECIMAL_DIGIT_PATTERN.test(char)),
+  );
+}
+
 const VOWELS = ["a", "a", "a", "e", "e", "e", "e", "i", "i", "o", "o", "u"];
 const CONSONANTS = [
   "b",

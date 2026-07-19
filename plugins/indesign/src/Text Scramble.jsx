@@ -112,6 +112,10 @@
     });
   }
 
+  function hasScramblableContents(source, scrambleNumbers) {
+    return /[A-Za-z]/.test(source) || (scrambleNumbers && /[0-9]/.test(source));
+  }
+
   function toCharacters(value) {
     var result = [];
     var index = 0;
@@ -137,7 +141,7 @@
     var name = constructorName(item);
     try {
       if (name === "TextFrame" || name === "EndnoteTextFrame") return item.texts.item(0);
-      if (name === "Text" || name === "Character" || name === "Word" || name === "Line" || name === "Paragraph" || name === "TextStyleRange" || name === "Story") return item;
+      if (name === "Text" || name === "Character" || name === "Word" || name === "Line" || name === "Paragraph" || name === "TextColumn" || name === "TextStyleRange" || name === "Cell" || name === "Story") return item;
     } catch (error) {}
     return null;
   }
@@ -150,21 +154,40 @@
     }
   }
 
+  function addTarget(target, targets, seen) {
+    if (!target || !target.contents || !target.contents.length) return;
+    var key = "";
+    try { key = target.toSpecifier(); } catch (error) {}
+    if (key && seen[key]) return;
+    if (key) seen[key] = true;
+    targets.push(target);
+  }
+
+  function addFrameTargets(container, targets, seen) {
+    var pageItems;
+    try { pageItems = container.allPageItems; } catch (error) { return; }
+    var index;
+    for (index = 0; index < pageItems.length; index += 1) {
+      var frame;
+      try { frame = typeof pageItems.item === "function" ? pageItems.item(index) : pageItems[index]; } catch (error) { continue; }
+      var name = constructorName(frame);
+      if ((name !== "TextFrame" && name !== "EndnoteTextFrame") || !editableFrame(frame)) continue;
+      try { addTarget(frame.texts.item(0), targets, seen); } catch (error) {}
+    }
+  }
+
   function targetsFor(scope) {
     var targets = [];
+    var seen = {};
     var index;
     if (scope === "selection") {
       for (index = 0; index < app.selection.length; index += 1) {
         var selectedText = textFromSelection(app.selection[index]);
-        if (selectedText && selectedText.contents.length) targets.push(selectedText);
+        if (selectedText) addTarget(selectedText, targets, seen);
+        else addFrameTargets(app.selection[index], targets, seen);
       }
     } else {
-      var frames = app.activeWindow.activePage.textFrames;
-      for (index = 0; index < frames.length; index += 1) {
-        if (!editableFrame(frames.item(index))) continue;
-        var pageText = frames.item(index).texts.item(0);
-        if (pageText.contents.length) targets.push(pageText);
-      }
+      addFrameTargets(app.activeWindow.activePage, targets, seen);
     }
     return targets;
   }
@@ -173,9 +196,16 @@
     var sourceCharacters = toCharacters(source);
     var outputCharacters = toCharacters(output);
     if (sourceCharacters.length !== outputCharacters.length) throw new Error("Scrambled text changed character structure.");
+    var edits = [];
     var index;
     for (index = outputCharacters.length - 1; index >= 0; index -= 1) {
-      if (sourceCharacters[index] !== outputCharacters[index]) target.characters.item(index).contents = outputCharacters[index];
+      if (sourceCharacters[index] === outputCharacters[index]) continue;
+      var character = target.characters.item(index);
+      if (!character || character.isValid === false) throw new Error("Cannot edit character " + (index + 1) + ".");
+      edits.push({ character: character, replacement: outputCharacters[index] });
+    }
+    for (index = 0; index < edits.length; index += 1) {
+      edits[index].character.contents = edits[index].replacement;
     }
   }
 
@@ -196,6 +226,10 @@
   if (!accepted) return;
 
   var targets = targetsFor(scope);
+  var targetIndex;
+  for (targetIndex = targets.length - 1; targetIndex >= 0; targetIndex -= 1) {
+    if (!hasScramblableContents(String(targets[targetIndex].contents), scrambleNumbers)) targets.splice(targetIndex, 1);
+  }
   if (!targets.length) {
     alert(scope === "selection" ? "Select text or one or more text frames." : "No editable text on the active page.", "Text Scramble");
     return;

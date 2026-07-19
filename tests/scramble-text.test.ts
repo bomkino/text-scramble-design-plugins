@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { estimateVisualWidth, scrambleText, scrambleTexts } from "../packages/core/src/scramble-text";
+import { estimateVisualWidth, hasScramblableText, scrambleText, scrambleTexts } from "../packages/core/src/scramble-text";
 
 function seededRandom(seed: number): () => number {
   let state = seed >>> 0;
@@ -50,6 +50,14 @@ test("leaves text without letters or numbers unchanged", () => {
   const source = "  — ✦\n\t…  ";
 
   assert.equal(scrambleText(source, { random: seededRandom(9) }), source);
+});
+
+test("detects only content the selected options can change", () => {
+  assert.equal(hasScramblableText(" — ✦\n"), false);
+  assert.equal(hasScramblableText("Ⅷ · ½ · ²"), false);
+  assert.equal(hasScramblableText("東京"), true);
+  assert.equal(hasScramblableText("٢٠٢٦"), true);
+  assert.equal(hasScramblableText("٢٠٢٦", { scrambleNumbers: false }), false);
 });
 
 test("preserves casing patterns", () => {

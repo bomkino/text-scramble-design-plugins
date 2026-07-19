@@ -356,7 +356,8 @@
         }
 
         if (message.type === "complete") {
-          setWorking(false);
+          button.disabled = true;
+          button.textContent = "Done";
           showStatus(`Done — ${message.layers} ${message.layers === 1 ? "layer" : "layers"}, ${message.characters.toLocaleString()} characters.`, "success");
         }
 

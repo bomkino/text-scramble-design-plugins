@@ -1,6 +1,6 @@
 {
   "name": "text-scramble-design-plugins",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Shape-matched placeholder copy for Figma and Adobe InDesign.",
   "author": "pitch.dog",
@@ -24,10 +24,10 @@
     "package": "npm run verify && node scripts/package.mjs"
   },
   "devDependencies": {
-    "@figma/plugin-typings": "latest",
-    "@types/node": "latest",
-    "esbuild": "latest",
-    "tsx": "latest",
-    "typescript": "latest"
+    "@figma/plugin-typings": "^1.131.0",
+    "@types/node": "^26.1.1",
+    "esbuild": "^0.28.1",
+    "tsx": "^4.23.1",
+    "typescript": "^7.0.2"
   }
 }

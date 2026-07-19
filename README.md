@@ -29,7 +29,7 @@ Text Scramble changes the current selection or page. Duplicate the Figma page or
 
 ## Develop
 
-Requires Node.js 20 or newer.
+Requires Node.js 20 or newer. Release packaging currently uses macOS `sips` and `ditto`; the plugin runtime remains compatible with Figma and InDesign on macOS and Windows.
 
 ```bash
 npm install
@@ -37,7 +37,7 @@ npm run verify
 npm run package
 ```
 
-`npm run verify` type-checks, runs the 18 engine tests, builds both hosts, and validates the manifests, privacy boundary, formatting paths, UI copy, legacy Unicode indexing, and bundle sizes.
+`npm run verify` type-checks, runs the deterministic test suite, builds both hosts, and validates the manifests, privacy boundary, formatting paths, UI copy, legacy Unicode indexing, and bundle sizes.
 
 ## Project map
 
