@@ -335,7 +335,7 @@ function makeCandidate(length: number, random: RandomSource): string {
 }
 
 function isUppercaseLetter(char: string): boolean {
-  return char !== char.toLowerCase() && char === char.toUpperCase();
+  return char !== char.toLowerCase();
 }
 
 function applyCasePattern(candidate: string, sourceCharacters: readonly string[]): string {

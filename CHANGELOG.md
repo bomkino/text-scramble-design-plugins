@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.2 — 2026-08-12
+
+- Preserved Unicode titlecase letters as uppercase-shaped invented copy.
+- Added regression coverage and rebuilt both Figma and InDesign artifacts from the shared core.
+
 ## 1.0.1 — 2026-07-19
 
 - Prevented punctuation-only and number-preserving selections from reporting a false success.

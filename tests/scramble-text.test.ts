@@ -24,7 +24,7 @@ function separators(text: string): string[] {
 function caseMask(text: string): string {
   return Array.from(text)
     .filter((char) => /\p{L}/u.test(char))
-    .map((char) => (char !== char.toLowerCase() && char === char.toUpperCase() ? "U" : "l"))
+    .map((char) => (char !== char.toLowerCase() ? "U" : "l"))
     .join("");
 }
 
@@ -65,6 +65,14 @@ test("preserves casing patterns", () => {
   const result = scrambleText(source, { random: seededRandom(2) });
 
   assert.equal(caseMask(result), caseMask(source));
+});
+
+test("treats Unicode titlecase letters as uppercase", () => {
+  const result = scrambleText("ǅuro ǈub", { random: seededRandom(34) });
+  const letters = Array.from(result).filter((char) => /\p{L}/u.test(char));
+
+  assert.match(letters[0], /^[A-Z]$/);
+  assert.match(letters[4], /^[A-Z]$/);
 });
 
 test("maps repeated words consistently within one selection", () => {
