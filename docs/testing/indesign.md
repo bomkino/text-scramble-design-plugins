@@ -6,7 +6,7 @@ Run these in Parts 2 and 3 of the [Mac brief](README.md), on `main` unless the c
 
 - **Scratch documents only.** Every check starts from a NEW document made by `indesign-fixture.jsx` (or by the harness). Never open a real document. Close scratch documents with **Don't Save**.
 - Invented text only. The fixture uses the brief's names: Brindlewick, Quellmoor.
-- After every run that changes text, press **⌘Z once** (Edit › Undo Text Scramble) and check that everything comes back. Write "undo ok" or what stayed changed.
+- After every run that changes text, press **⌘Z once** (**Edit › Undo Text Scramble**) and check that everything comes back. Write "undo ok" or what stayed changed.
 - Record each check in `RESULTS.md` as pass, fail or blocked, with what you saw. Screenshot anything that fails.
 - Files in this folder:
   - `indesign-fixture.jsx`: builds the scratch document and leaves it open (for the panel checks).
@@ -119,7 +119,7 @@ Setup: build a scratch document with `indesign-fixture.bom.jsx`. Ask the person 
 - **Expect:**
   - The button reads **Shaping fresh language…** while it works.
   - The report starts **Done — … characters in …** and mentions the overset text.
-  - It ends with **Edit › Undo Text Scramble puts it all back in one step.**
+  - It ends with **Edit > Undo Text Scramble puts it all back in one step.**
   - In the dump: page 2's frame text and the overset tail are scrambled. Page 1's frame, the parent page and the pasteboard note are unchanged.
   - ⌘Z once restores everything.
 

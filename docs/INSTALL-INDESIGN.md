@@ -45,7 +45,7 @@ All three ask the same things:
 
 In the panel, click **Scramble with soul**. Afterwards a report says what changed, what was skipped and why, and which pages now have text that overflows its frame.
 
-One **Edit › Undo** (⌘Z) puts the whole run back.
+One **Edit › Undo Text Scramble** (⌘Z) puts the whole run back.
 
 Everything happens on your computer. Before you share the file, read [Before you share](https://github.com/bomkino/text-scramble-design-plugins/blob/main/PRIVACY.md).
 
