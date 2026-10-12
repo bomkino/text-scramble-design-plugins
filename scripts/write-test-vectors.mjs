@@ -34,6 +34,7 @@ const cases = [
   { inputs: ["Write to hello@quellmoor.co or visit https://www.quellmoor.co/work/autumn-menu?ref=deck."], seed: "web" },
   { inputs: ["north-star.studio · NORTH-STAR.STUDIO · mail.north-star.co.uk · Ada.Quell@orchard.photography"], seed: 11 },
   { inputs: ["mailto:team@example.com · demo.example.org · shop.local · Zoë@café.fr · e.g. 3.14 Next.js"], seed: 12 },
+  { inputs: ["The end.Next week, the file.App runs; see Quellmoor.Studio or hello@Quellmoor.Studio."], seed: "spring" },
 ];
 
 const vectors = cases.map(({ inputs, seed, scrambleNumbers }) => {

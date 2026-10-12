@@ -109,6 +109,18 @@ function labelText(tokens: readonly Token[], [start, end]: [number, number]): st
     .toLowerCase();
 }
 
+// Without "@", "://" or "www.", a domain also needs its ending in lower case or the whole domain in capitals
+// ("studio.design", "NORTH-STAR.STUDIO"). A capitalised ending is a missing space after a full stop far more
+// often than an address: "the end.Next week", "the file.App runs".
+function writtenLikeADomain(tokens: readonly Token[], start: number, end: number, ending: string): boolean {
+  if (ending === ending.toLowerCase()) return true;
+  const text = tokens
+    .slice(start, end)
+    .map((token) => token.text)
+    .join("");
+  return text === text.toUpperCase();
+}
+
 function safeEnding(length: number): { ending: string; filler: number } {
   const exact = SAFE_ENDINGS_BY_LENGTH[length];
   if (exact) return { ending: exact, filler: 0 };
@@ -149,11 +161,13 @@ export function planWebAddresses(
     const afterScheme = before(1) === "/" && before(2) === "/" && before(3) === ":";
     const startsWithWww = labelText(tokens, labels[0]) === "www";
     const endingIndex = labels[labels.length - 1][0];
-    const ending = tokens[endingIndex].text.toLowerCase();
+    const source = tokens[endingIndex].text;
+    const ending = source.toLowerCase();
     // "first.last@" is the name part of an email, not a domain.
     if (tokens[domainEnd]?.text === "@") continue;
     const known = KNOWN_ENDINGS.has(ending) || SAFE_ENDINGS.has(ending);
-    if (!afterAt && !afterScheme && !startsWithWww && !known) continue;
+    const bare = known && writtenLikeADomain(tokens, labels[0][0], domainEnd, source);
+    if (!afterAt && !afterScheme && !startsWithWww && !bare) continue;
 
     index = domainEnd - 1;
     const lastTwo = `${labelText(tokens, labels[labels.length - 2])}.${ending}`;
@@ -181,7 +195,6 @@ export function planWebAddresses(
     if (startsWithWww) {
       for (let position = labels[0][0]; position < labels[0][1]; position++) plans.set(position, { keep: true });
     }
-    const source = tokens[endingIndex].text;
     const upper = source === source.toUpperCase() && source !== source.toLowerCase();
     const { ending: replacement, filler } = safeEnding(Array.from(source).length);
     const capitalised = source.charAt(0) !== source.charAt(0).toLowerCase();
