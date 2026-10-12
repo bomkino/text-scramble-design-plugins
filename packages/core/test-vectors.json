@@ -1,0 +1,163 @@
+[
+  {
+    "inputs": [
+      "Stories deserve more than a template."
+    ],
+    "options": {
+      "seed": 1
+    },
+    "outputs": [
+      "Lelosot lomoled onan baro e frameclu."
+    ]
+  },
+  {
+    "inputs": [
+      "We shape complex ideas into clear, compelling worlds."
+    ],
+    "options": {
+      "seed": "studio"
+    },
+    "outputs": [
+      "Ma ageco veconos reroe tuni letes, vearupatul hupavi."
+    ]
+  },
+  {
+    "inputs": [
+      "Quiet confidence. Human texture. A little bit of magic."
+    ],
+    "options": {
+      "seed": 2026
+    },
+    "outputs": [
+      "Betal teneretevu. Mebeu roracer. E trafil fle ra noron."
+    ]
+  },
+  {
+    "inputs": [
+      "SHAPE Shape shape — sHaPe"
+    ],
+    "options": {
+      "seed": "case"
+    },
+    "outputs": [
+      "NOSAD Nosad nosad — nOsAd"
+    ]
+  },
+  {
+    "inputs": [
+      "Café résumé naïve, crème brûlée and a façade."
+    ],
+    "options": {
+      "seed": "accents"
+    },
+    "outputs": [
+      "Efaś sóenań slüna, anàvu laêtán dao e coļebo."
+    ]
+  },
+  {
+    "inputs": [
+      "Café résumé naïve, crème brûlée and a façade."
+    ],
+    "options": {
+      "seed": "accents"
+    },
+    "outputs": [
+      "Efaś sóenań slüna, anàvu laêtán dao e coļebo."
+    ]
+  },
+  {
+    "inputs": [
+      "Đặng Việt · Ångström · Łódź · Ñandú · São Paulo"
+    ],
+    "options": {
+      "seed": 7
+    },
+    "outputs": [
+      "Rặme Teậl · Bospenür · Hápé · Ẽramé · Cẽd Oseta"
+    ]
+  },
+  {
+    "inputs": [
+      "ǅuro İstanbul ıi ß Æsir Œuvre"
+    ],
+    "options": {
+      "seed": 8
+    },
+    "outputs": [
+      "Tonu Tonuleci la o Neti Toden"
+    ]
+  },
+  {
+    "inputs": [
+      "한국어 東京 Ελληνικά Русский עברית"
+    ],
+    "options": {
+      "seed": 9
+    },
+    "outputs": [
+      "non ho Demobavé Amagotă groma"
+    ]
+  },
+  {
+    "inputs": [
+      "Edition 2026 · ２０２６ · ٢٠٢٦ · ۲۰۲۶ · २०२६ · 𝟚𝟘𝟚𝟞 · Ⅷ ½ ²"
+    ],
+    "options": {
+      "seed": 10
+    },
+    "outputs": [
+      "Leblera 7200 · ８６０７ · ٠٩٨٩ · ۹۵۳۲ · ५५८० · 𝟠𝟡𝟡𝟘 · Ⅷ ½ ²"
+    ]
+  },
+  {
+    "inputs": [
+      "Edition 2026, page 14 of 120."
+    ],
+    "options": {
+      "seed": 10,
+      "scrambleNumbers": false
+    },
+    "outputs": [
+      "Leblera 2026, doso 14 ar 120."
+    ]
+  },
+  {
+    "inputs": [
+      "Watch the reflect toSource unwatch constructor valueOf __proto__ hasOwnProperty prototype"
+    ],
+    "options": {
+      "seed": "es3"
+    },
+    "outputs": [
+      "Puspa fen iprinar erOrased erevemo misolefavar rosenAl __busin__ tovEmaSevaosin guslarave"
+    ]
+  },
+  {
+    "inputs": [
+      "Sloane met Ruby in Lisbon.",
+      "RUBY and SLOANE, 2026",
+      "",
+      "  — ✦\n\t…  "
+    ],
+    "options": {
+      "seed": "deck"
+    },
+    "outputs": [
+      "Pehovi una Taan ni Virase.",
+      "TAAN neu PEHOVI, 0715",
+      "",
+      "  — ✦\n\t…  "
+    ]
+  },
+  {
+    "inputs": [
+      "A quiet title\n\nDesign\twith soul — always.\nhello@example.com · 2026 ✦"
+    ],
+    "options": {
+      "seed": 0
+    },
+    "outputs": [
+      "E ealar rotil\n\nOsevol\tgelu habi — dranod.\ntidas@cowonid.mus · 7787 ✦"
+    ]
+  }
+]
