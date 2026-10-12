@@ -18,6 +18,7 @@
   },
   "scripts": {
     "build": "node scripts/build.mjs",
+    "icons": "node scripts/render-icons.mjs",
     "test": "node --import tsx --test tests/*.test.ts",
     "typecheck": "tsc --noEmit",
     "verify": "npm run typecheck && npm test && npm run build && node scripts/verify-build.mjs",
@@ -28,6 +29,7 @@
     "@types/node": "^26.1.1",
     "acorn": "8.18.0",
     "esbuild": "^0.28.1",
+    "fflate": "^0.8.3",
     "tsx": "^4.23.1",
     "typescript": "^7.0.2"
   }

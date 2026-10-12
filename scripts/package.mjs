@@ -1,8 +1,10 @@
+import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { unzipSync, zipSync } from "fflate";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const artifacts = path.join(root, "artifacts");
@@ -22,9 +24,40 @@ async function stage(name, plugin, installGuide) {
   return target;
 }
 
+// Every entry carries the last commit's time, so one commit always packs into the same bytes, on
+// macOS, Linux or Windows. Zip stores wall-clock time, so shift it to read as UTC in any time zone.
+function commitTime() {
+  if (process.env.SOURCE_DATE_EPOCH) return Number(process.env.SOURCE_DATE_EPOCH) * 1000;
+  const git = spawnSync("git", ["log", "-1", "--format=%ct"], { cwd: root, encoding: "utf8" });
+  return git.status === 0 && git.stdout.trim() ? Number(git.stdout.trim()) * 1000 : Date.now();
+}
+const committed = commitTime();
+const mtime = new Date(committed + new Date(committed).getTimezoneOffset() * 60_000);
+
+// Same layout as macOS `ditto -c -k --keepParent`: one top folder, folder entries, Unix permissions.
 async function archive(source, output) {
-  const child = spawnSync("ditto", ["-c", "-k", "--sequesterRsrc", "--keepParent", source, output], { encoding: "utf8" });
-  if (child.status !== 0) throw new Error(child.stderr || "Could not create archive.");
+  const entries = {};
+  const files = {};
+  async function add(directory, prefix) {
+    entries[`${prefix}/`] = [new Uint8Array(0), { level: 0, os: 3, attrs: 0o40755 * 0x10000, mtime }];
+    const children = (await readdir(directory, { withFileTypes: true })).sort((a, b) => (a.name < b.name ? -1 : 1));
+    for (const child of children) {
+      if (child.name === ".DS_Store") continue;
+      const name = `${prefix}/${child.name}`;
+      if (child.isDirectory()) {
+        await add(path.join(directory, child.name), name);
+      } else {
+        files[name] = await readFile(path.join(directory, child.name));
+        entries[name] = [files[name], { level: 9, os: 3, attrs: 0o100644 * 0x10000, mtime }];
+      }
+    }
+  }
+  await add(source, path.basename(source));
+  const zip = zipSync(entries);
+  const unpacked = unzipSync(zip);
+  assert.deepEqual(Object.keys(unpacked).sort(), Object.keys(entries).sort());
+  for (const [name, data] of Object.entries(files)) assert.ok(Buffer.from(unpacked[name]).equals(data), `${name} did not survive zipping.`);
+  await writeFile(output, zip);
 }
 
 const figmaStage = await stage("Text Scramble - Figma", path.join(root, "plugins", "figma"), "INSTALL-FIGMA.md");
