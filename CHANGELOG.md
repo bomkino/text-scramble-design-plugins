@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.3 — 2026-10-12
+
+- Fixed the classic InDesign JSX, which ExtendScript refused to load because reserved words (`for`, `in`, `new`) were used as unquoted object keys.
+- Fixed a crash in the classic JSX when copy contained words such as "watch" or "reflect", which collided with members ExtendScript adds to every object.
+- Moved the common-word and unwelcome-fragment lists into `packages/core/src/word-lists.ts`. The build now injects them into the JSX, so every host blocks the same words.
+- Added about 200 everyday words the generator was observed to produce (such as "ten", "rose" and "rude") to the common-word list.
+- Verification now parses the JSX as ES3 and runs its engine in a sandbox that mimics ExtendScript's inherited object members.
+
 ## 1.0.2 — 2026-08-12
 
 - Preserved Unicode titlecase letters as uppercase-shaped invented copy.
