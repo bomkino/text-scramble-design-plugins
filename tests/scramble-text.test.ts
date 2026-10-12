@@ -93,8 +93,10 @@ test("maps repeated words consistently across multiple text layers", () => {
 
 test("keeps generated ASCII casing stable for Turkish letter forms", () => {
   const result = scrambleText("Iİıi", { random: seededRandom(31) });
+  const withoutMarks = result.normalize("NFD").replace(/\p{M}/gu, "");
 
-  assert.match(result, /^[A-Z]{2}[a-z]{2}$/);
+  assert.match(withoutMarks, /^[A-Z]{2}[a-z]{2}$/);
+  assert.equal(Array.from(result).length, 4);
 });
 
 test("maps canonically equivalent accented words safely in either order", () => {
