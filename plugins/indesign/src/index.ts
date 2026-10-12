@@ -23,7 +23,7 @@ function refreshScope(): void {
   const summaryCount = byId<HTMLElement>("summary-count");
   if (!summaryCopy || !summaryCount) return;
   try {
-    const summary = inspectScope(currentScope(), byId<HTMLInputElement>("numbers")?.checked !== false);
+    const summary = inspectScope({ scope: currentScope(), scrambleNumbers: byId<HTMLInputElement>("numbers")?.checked !== false });
     summaryCopy.textContent = summary.targets ? `${summary.characters.toLocaleString()} characters ready` : "No eligible text yet";
     summaryCount.textContent = `${summary.targets} ${summary.targets === 1 ? "frame" : "frames"}`;
   } catch (error) {
@@ -45,12 +45,12 @@ function bindPanel(): void {
     button.textContent = "Shaping fresh language…";
     setStatus("Reading character styles and preparing one clean undo step…");
     try {
-      const result = scrambleDocument(currentScope(), byId<HTMLInputElement>("numbers")?.checked !== false);
-      if (!result.targets) {
+      const result = scrambleDocument({ scope: currentScope(), scrambleNumbers: byId<HTMLInputElement>("numbers")?.checked !== false });
+      if (!result.changed) {
         setStatus(currentScope() === "selection" ? "Select text or one or more text frames." : "No editable text on the active page.", "error");
       } else {
-        const skipped = result.skipped ? ` · ${result.skipped} skipped` : "";
-        setStatus(`Done — ${result.targets} ${result.targets === 1 ? "frame" : "frames"}, ${result.characters.toLocaleString()} characters${skipped}.`, "success");
+        const skipped = result.errors.length ? ` · ${result.errors.length} skipped` : "";
+        setStatus(`Done — ${result.changed} ${result.changed === 1 ? "frame" : "frames"}, ${result.characters.toLocaleString()} characters${skipped}.`, "success");
       }
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error), "error");
@@ -64,7 +64,7 @@ function bindPanel(): void {
 }
 
 entrypoints.setup({
-  commands: { scrambleSelection: () => scrambleDocument("selection", true) },
+  commands: { scrambleSelection: () => scrambleDocument({ scope: "selection", scrambleNumbers: true }) },
   panels: {
     textScramblePanel: {
       create() { bindPanel(); },

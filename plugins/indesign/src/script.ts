@@ -1,4 +1,6 @@
-import { app, scrambleDocument, type Scope } from "./operations";
+import { host, scrambleDocument, type Scope } from "./operations";
+
+const { app } = host();
 
 function showMessage(title: string, message: string): void {
   const dialog = app.dialogs.add({ name: title, canCancel: false });
@@ -22,8 +24,8 @@ if (!app.documents || app.documents.length === 0) {
   dialog.destroy();
 
   if (accepted) {
-    const result = scrambleDocument(scope, scrambleNumbers);
-    if (!result.targets) {
+    const result = scrambleDocument({ scope, scrambleNumbers });
+    if (!result.changed) {
       showMessage("Text Scramble", scope === "selection" ? "Select text or one or more text frames." : "No editable text on the active page.");
     }
   }
