@@ -157,7 +157,40 @@
       "seed": 0
     },
     "outputs": [
-      "E ealar rotil\n\nOsevol\tgelu habi — dranod.\ntidas@cowonid.mus · 7787 ✦"
+      "E ealar rotil\n\nOsevol\tgelu habi — dranod.\ntidas@example.com · 7787 ✦"
+    ]
+  },
+  {
+    "inputs": [
+      "Write to hello@quellmoor.co or visit https://www.quellmoor.co/work/autumn-menu?ref=deck."
+    ],
+    "options": {
+      "seed": "web"
+    },
+    "outputs": [
+      "Galat ra soris@gabidreho.xx tu ratri https://www.gabidreho.xx/udod/morono-nome?esi=voes."
+    ]
+  },
+  {
+    "inputs": [
+      "north-star.studio · NORTH-STAR.STUDIO · mail.north-star.co.uk · Ada.Quell@orchard.photography"
+    ],
+    "options": {
+      "seed": 11
+    },
+    "outputs": [
+      "teces-niroan.test · TECES-NIROAN.TEST · sebi.teces-niro.ge.xx · Vun.Sarei@bothetean.localhost"
+    ]
+  },
+  {
+    "inputs": [
+      "mailto:team@example.com · demo.example.org · shop.local · Zoë@café.fr · e.g. 3.14 Next.js"
+    ],
+    "options": {
+      "seed": 12
+    },
+    "outputs": [
+      "mailto:novu@example.com · demo.example.org · shop.local · Suä@hulá.xx · o.o. 4.60 Vara.le"
     ]
   }
 ]

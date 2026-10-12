@@ -1,3 +1,4 @@
+import { fillerText, planWebAddresses, type Token } from "./web-addresses";
 import { COMMON_WORDS as COMMON_WORD_LIST, UNWELCOME_FRAGMENTS } from "./word-lists";
 
 export type RandomSource = () => number;
@@ -420,9 +421,22 @@ function scrambleDigits(source: string, random: RandomSource): string {
     .join("");
 }
 
+function tokenize(input: string): Token[] {
+  const tokens: Token[] = [];
+  let last = 0;
+  for (const match of input.matchAll(TOKEN_PATTERN)) {
+    for (const char of input.slice(last, match.index)) tokens.push({ text: char, kind: "other" });
+    tokens.push({ text: match[0], kind: LETTER_PATTERN.test(match[0]) ? "word" : "number" });
+    last = match.index + match[0].length;
+  }
+  for (const char of input.slice(last)) tokens.push({ text: char, kind: "other" });
+  return tokens;
+}
+
 /**
  * Creates a scrambler that remembers every word it has invented, so a name becomes the same invented word
- * across all the texts of one run (every frame, layer or story).
+ * across all the texts of one run (every frame, layer or story). Emails and web addresses keep their shape
+ * but always end in a domain that can never be registered, such as ".test" or ".example".
  */
 export function createScrambler(options: ScrambleOptions = {}): Scrambler {
   const words = new Map<string, string>();
@@ -430,26 +444,39 @@ export function createScrambler(options: ScrambleOptions = {}): Scrambler {
   const randomFor = (key: string): RandomSource =>
     options.random ?? (seeded ? createSeededRandom(`${options.seed}\u0000${key}`) : Math.random);
 
+  const scrambleToken = (token: Token): string => {
+    if (token.kind === "number") {
+      return options.scrambleNumbers === false ? token.text : scrambleDigits(token.text, randomFor(`#${token.text}`));
+    }
+
+    const word = readWord(token.text);
+    const key = wordKey(word);
+    let baseWord = words.get(key);
+    if (!baseWord) {
+      baseWord = createBaseWord(word.clusters, randomFor(key), options.candidateCount);
+      words.set(key, baseWord);
+    }
+
+    const letters = word.clusters.map((cluster) => cluster.letter);
+    return spellWord(word, Array.from(applyCasePattern(baseWord, letters)));
+  };
+
   return {
     scramble(input, filter) {
-      return input.replace(TOKEN_PATTERN, (token) => {
-        if (filter && !filter(token)) return token;
+      const tokens = tokenize(input);
+      const accepted = tokens.map((token) => token.kind !== "other" && (!filter || filter(token.text)));
+      const plans = planWebAddresses(tokens, (index) => accepted[index]);
 
-        if (!LETTER_PATTERN.test(token)) {
-          return options.scrambleNumbers === false ? token : scrambleDigits(token, randomFor(`#${token}`));
-        }
-
-        const word = readWord(token);
-        const key = wordKey(word);
-        let baseWord = words.get(key);
-        if (!baseWord) {
-          baseWord = createBaseWord(word.clusters, randomFor(key), options.candidateCount);
-          words.set(key, baseWord);
-        }
-
-        const letters = word.clusters.map((cluster) => cluster.letter);
-        return spellWord(word, Array.from(applyCasePattern(baseWord, letters)));
-      });
+      return tokens
+        .map((token, index) => {
+          const plan = plans.get(index);
+          let text: string;
+          if (plan?.text !== undefined) text = plan.text;
+          else if (plan?.keep || !accepted[index]) text = token.text;
+          else text = scrambleToken(token);
+          return plan?.filler ? text + fillerText(plan.filler, plan.upper === true) : text;
+        })
+        .join("");
     },
   };
 }
