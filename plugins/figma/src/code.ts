@@ -47,6 +47,7 @@ function describeError(error: unknown): string {
 function runOptions(): RunOptions {
   return {
     scrambleNumbers: preferences.scrambleNumbers,
+    seed: preferences.seed,
     loadFont: (font) => figma.loadFontAsync(font),
   };
 }

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { scrambleLayers } from "../plugins/figma/src/run";
 import { scanScope } from "../plugins/figma/src/scope";
@@ -182,25 +183,39 @@ test("spots fixed-width text that now wraps onto more lines", async () => {
   assert.deepEqual(report.wrapped, [wrapping]);
 });
 
-test("the same seed gives the same result, a different seed a different one", async () => {
-  const make = () => {
+test("a seed repeats the result in any layer order, and a new seed changes it", async () => {
+  const sources = ["Studio Halden builds calm tools for 12 teams.", "Halden, since 2019"];
+  const runWith = async (seed: string, order: (layers: MockText[]) => MockText[] = (layers) => layers) => {
     const world = createWorld();
-    return [text(world, "Studio Halden builds calm tools for 12 teams."), text(world, "Halden, since 2019")];
+    const layers = sources.map((source) => text(world, source));
+    await scrambleLayers(order(layers), { scrambleNumbers: true, seed, loadFont: world.loadFont });
+    return layers.map((layer) => layer.characters);
   };
-  const first = make();
-  const second = make();
-  const third = make();
 
-  await run(first, first[0].world, 7);
-  await run(second, second[0].world, 7);
-  await run(third, third[0].world, 8);
+  const first = await runWith("spring");
+  assert.deepEqual(await runWith("spring"), first);
+  assert.deepEqual(await runWith("spring", (layers) => [...layers].reverse()), first);
+  assert.notDeepEqual(await runWith("autumn"), first);
+  assert.equal(words(first[0])[1], words(first[1])[0]);
+});
 
-  assert.deepEqual(
-    first.map((layer) => layer.characters),
-    second.map((layer) => layer.characters),
-  );
-  assert.notDeepEqual(
-    first.map((layer) => layer.characters),
-    third.map((layer) => layer.characters),
-  );
+test("matches the shared engine's test vectors, so a seed gives the same words as the other apps", async () => {
+  const vectors: { inputs: string[]; options: { seed?: number | string; scrambleNumbers?: boolean }; outputs: string[] }[] =
+    JSON.parse(readFileSync(new URL("../packages/core/test-vectors.json", import.meta.url), "utf8"));
+  assert.ok(vectors.length > 0);
+
+  for (const vector of vectors) {
+    const world = createWorld();
+    const layers = vector.inputs.map((input) => text(world, input, { name: "Sample" }));
+    await scrambleLayers(layers, {
+      scrambleNumbers: vector.options.scrambleNumbers !== false,
+      seed: vector.options.seed === undefined ? undefined : String(vector.options.seed),
+      loadFont: world.loadFont,
+    });
+    assert.deepEqual(
+      layers.map((layer) => layer.characters),
+      vector.outputs,
+      `Seed ${JSON.stringify(vector.options.seed)} gave different words in Figma.`,
+    );
+  }
 });

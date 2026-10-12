@@ -1,9 +1,12 @@
 import { buildReplacementRuns } from "../../../packages/core/src/replacement-runs";
-import { hasScramblableText, scrambleTexts, type RandomSource } from "../../../packages/core/src/scramble-text";
+import { createScrambler, hasScramblableText, type RandomSource } from "../../../packages/core/src/scramble-text";
 import type { FontNameLike, TextLayer } from "./scope";
 
 export interface RunOptions {
   scrambleNumbers: boolean;
+  // Same seed, same invented word for each word, in every layer, run and app. "" means a fresh draft.
+  seed?: string;
+  // For tests: supplies the randomness directly and takes priority over the seed.
   random?: RandomSource;
   loadFont(font: FontNameLike): Promise<void>;
 }
@@ -55,13 +58,11 @@ export async function scrambleLayers(layers: readonly TextLayer[], options: RunO
   const autoRenames = layers.map((layer) => layer.autoRename);
   const renameIndexes = layers.flatMap((layer, index) => (nameFollowsText(layer, originals[index]) ? [index] : []));
 
-  // One call for every layer and every mirrored name shares one word cache, so a word becomes the
-  // same invented word everywhere in this run. Names go last so they never change the text output.
-  const outputs = scrambleTexts([...originals, ...renameIndexes.map((index) => names[index])], {
-    scrambleNumbers: options.scrambleNumbers,
-    random: options.random,
-  });
-  const renamedTo = new Map(renameIndexes.map((layerIndex, position) => [layerIndex, outputs[layers.length + position]]));
+  // One scrambler for every layer and every mirrored name shares one word cache, so a word becomes
+  // the same invented word everywhere in this run. Names go last so they never change the text output.
+  const scrambler = createScrambler({ scrambleNumbers: options.scrambleNumbers, seed: options.seed, random: options.random });
+  const outputs = originals.map((text) => scrambler.scramble(text));
+  const renamedTo = new Map(renameIndexes.map((index) => [index, scrambler.scramble(names[index])]));
 
   const fontsByLayer = layers.map((layer, index) => {
     try {
