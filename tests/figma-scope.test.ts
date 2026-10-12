@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { scanScope, sortByLayerOrder } from "../plugins/figma/src/scope";
+import { scanScope, sortByLayerOrder, type TreeNode } from "../plugins/figma/src/scope";
 import { component, createWorld, frame, instanceOf, page, text } from "./helpers/figma-mock";
 
 const DEFAULTS = { includeHidden: false, scrambleNumbers: true };
@@ -19,7 +19,7 @@ test("page scope finds text in frames, main components and instances", () => {
   assert.equal(scan.characters, "Ada Lovelace".length * 2 + "Quarterly results".length);
 });
 
-test("skips hidden and locked text, says how many, and includes it on request", () => {
+test("skips hidden text unless asked, and scrambles locked text because it still exports", () => {
   const world = createWorld();
   const root = page(
     world,
@@ -31,22 +31,25 @@ test("skips hidden and locked text, says how many, and includes it on request", 
   );
 
   const skipping = scanScope("page", [root], DEFAULTS);
-  assert.deepEqual(skipping.skipped, { hidden: 2, locked: 2, missingFont: 0 });
+  assert.deepEqual(skipping.skipped, { hidden: 2, missingFont: 0 });
+  assert.equal(skipping.locked, 2);
   assert.deepEqual(
     skipping.eligible.map((layer) => layer.characters),
-    ["Visible copy"],
+    ["Visible copy", "Inside a locked frame", "Locked copy"],
   );
 
   const including = scanScope("page", [root], { ...DEFAULTS, includeHidden: true });
-  assert.deepEqual(including.skipped, { hidden: 0, locked: 0, missingFont: 0 });
+  assert.deepEqual(including.skipped, { hidden: 0, missingFont: 0 });
   assert.equal(including.eligible.length, 5);
 });
 
-test("counts a layer that is both hidden and locked once, as hidden", () => {
+test("counts a layer that is both hidden and locked as hidden", () => {
   const world = createWorld();
   const root = page(world, frame(world, { locked: true }, text(world, "Both", { visible: false })));
 
-  assert.deepEqual(scanScope("page", [root], DEFAULTS).skipped, { hidden: 1, locked: 0, missingFont: 0 });
+  const scan = scanScope("page", [root], DEFAULTS);
+  assert.deepEqual(scan.skipped, { hidden: 1, missingFont: 0 });
+  assert.equal(scan.locked, 0);
 });
 
 test("hidden layers inside instances vanish from the scan when Figma is told to skip them", () => {
@@ -57,7 +60,7 @@ test("hidden layers inside instances vanish from the scan when Figma is told to 
   world.skipInvisibleInstanceChildren = true;
   const fast = scanScope("page", [root], DEFAULTS);
   assert.equal(fast.textLayers, 3);
-  assert.deepEqual(fast.skipped, { hidden: 1, locked: 0, missingFont: 0 });
+  assert.deepEqual(fast.skipped, { hidden: 1, missingFont: 0 });
   assert.deepEqual(
     fast.eligible.map((layer) => layer.characters),
     ["Buy now", "Buy now"],
@@ -166,5 +169,24 @@ test("a root Figma refuses to read counts as hidden instead of failing the scan"
 
   const scan = scanScope("selection", [readable, refused], DEFAULTS);
   assert.equal(scan.eligible.length, 1);
+  assert.equal(scan.skipped.hidden, 1);
+});
+
+test("a selected layer whose every property Figma refuses still only counts as hidden", () => {
+  const world = createWorld();
+  const readable = text(world, "Readable");
+  page(world, readable);
+  const refuse = () => {
+    throw new Error("The node with id I9:1;2:3 does not exist");
+  };
+  const refused = Object.defineProperties({}, {
+    id: { get: refuse },
+    type: { get: refuse },
+    name: { get: refuse },
+    parent: { get: refuse },
+  }) as unknown as TreeNode;
+
+  const scan = scanScope("selection", [readable, refused], DEFAULTS);
+  assert.deepEqual(scan.eligible, [readable]);
   assert.equal(scan.skipped.hidden, 1);
 });

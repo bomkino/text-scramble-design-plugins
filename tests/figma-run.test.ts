@@ -153,6 +153,53 @@ test("loads each font once for the whole run", async () => {
   assert.deepEqual(loads, ["Inter Regular"]);
 });
 
+test("instance text that follows its main is not failed over its own font", async () => {
+  const world = createWorld();
+  world.missingFonts.add("Brand Serif Italic");
+  const main = component(world, { name: "Tag" }, text(world, "Limited offer"));
+  const instance = instanceOf(main);
+  page(world, main, instance);
+  const instanceText = instance.children[0] as MockText;
+  // A style override in the instance uses a font that won't load; its characters still follow the main.
+  instanceText.fonts = [{ family: "Brand Serif", style: "Italic" }];
+
+  const report = await run([main.children[0] as MockText, instanceText]);
+
+  assert.deepEqual(report.failed, []);
+  assert.equal(report.inherited, 1);
+  assert.equal(instanceText.characters, (main.children[0] as MockText).characters);
+});
+
+test("a name Figma refuses doesn't fail a layer whose text changed", async () => {
+  const world = createWorld();
+  const layer = text(world, "Spring launch");
+  let name = layer.name;
+  Object.defineProperty(layer, "name", {
+    get: () => name,
+    set: () => {
+      throw new Error("Cannot rename this layer");
+    },
+  });
+
+  const report = await run([layer]);
+
+  assert.equal(report.layers, 1);
+  assert.deepEqual(report.failed, []);
+  assert.equal(report.renamed, 0);
+  assert.notEqual(layer.characters, "Spring launch");
+  assert.equal(name, "Spring launch");
+});
+
+test("a name that copies its text gets exactly the new text, numbers included", async () => {
+  const world = createWorld();
+  const layer = text(world, "Q3 report 2026", { name: "Q3 report 2026", autoRename: false });
+
+  await scrambleLayers([layer], { scrambleNumbers: true, loadFont: world.loadFont });
+
+  assert.notEqual(layer.characters, "Q3 report 2026");
+  assert.equal(layer.name, layer.characters);
+});
+
 test("reports a layer that throws while writing without stopping the run", async () => {
   const world = createWorld();
   const fine = text(world, "Calm words");

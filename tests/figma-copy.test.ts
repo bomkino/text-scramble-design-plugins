@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { mock } from "node:test";
 import test from "node:test";
-import { readPreferences, resultView, summaryView } from "../plugins/figma/src/copy";
+import { readPreferences, resultView, scanErrorView, summaryView } from "../plugins/figma/src/copy";
 import { debounce } from "../plugins/figma/src/debounce";
 import type { RunReport } from "../plugins/figma/src/run";
 import type { ScanResult, TextLayer } from "../plugins/figma/src/scope";
@@ -9,12 +9,14 @@ import type { ScanResult, TextLayer } from "../plugins/figma/src/scope";
 function scan(overrides: Partial<ScanResult> = {}): ScanResult {
   return {
     scope: "selection",
+    includeHidden: false,
     roots: 1,
     textLayers: 3,
     eligible: [{} as TextLayer, {} as TextLayer, {} as TextLayer],
     characters: 1204,
-    skipped: { hidden: 0, locked: 0, missingFont: 0 },
+    skipped: { hidden: 0, missingFont: 0 },
     numbersOnly: 0,
+    locked: 0,
     inMainComponents: 0,
     ...overrides,
   };
@@ -30,31 +32,54 @@ test("asks for a selection when nothing is selected", () => {
   assert.equal(view.canScramble, false);
 });
 
-test("says where there is no text", () => {
-  assert.equal(summaryView(scan({ textLayers: 0, eligible: [] })).headline, "No text in your selection");
-  assert.equal(summaryView(scan({ scope: "page", textLayers: 0, eligible: [] })).headline, "No text on this page");
+test("says where there is no text, and that hidden text wasn't counted", () => {
+  const selection = summaryView(scan({ textLayers: 0, eligible: [] }));
+  assert.equal(selection.headline, "No visible text in your selection");
+  assert.deepEqual(selection.details, [
+    "Select layers that contain text.",
+    "Hidden text isn’t counted. Turn on Include hidden layers to look for it.",
+  ]);
+  assert.equal(summaryView(scan({ scope: "page", includeHidden: true, textLayers: 0, eligible: [] })).headline, "No text on this page");
 });
 
 test("counts what is ready and lists what is skipped", () => {
-  const view = summaryView(scan({ skipped: { hidden: 2, locked: 1, missingFont: 3 } }));
+  const view = summaryView(scan({ skipped: { hidden: 2, missingFont: 3 }, locked: 1 }));
   assert.equal(view.headline, "1,204 characters ready");
   assert.equal(view.count, "3 layers");
-  assert.deepEqual(view.details, ["Skipping 2 hidden, 1 locked and 3 with missing fonts."]);
+  assert.deepEqual(view.details, [
+    "Skipping 2 hidden and 3 with missing fonts.",
+    "Includes 1 locked layer. Locked text still shows in exports.",
+  ]);
   assert.equal(view.canScramble, true);
 });
 
 test("warns that main components carry changes to their instances", () => {
-  const view = summaryView(scan({ inMainComponents: 1 }));
-  assert.match(view.details.join(" "), /1 layer is in a main component, so its instances change too/);
+  assert.match(summaryView(scan({ inMainComponents: 1 })).details.join(" "), /1 layer is in a main component, so its instances change too/);
+  assert.match(
+    summaryView(scan({ inMainComponents: 3 })).details.join(" "),
+    /3 layers are in main components, so their instances change too/,
+  );
+});
+
+test("does not call text skipped when some of it simply has nothing to change", () => {
+  const view = summaryView(scan({ eligible: [], characters: 0, textLayers: 3, skipped: { hidden: 1, missingFont: 0 } }));
+  assert.equal(view.headline, "Nothing here to change");
+  assert.deepEqual(view.details, ["Skipped: 1 hidden.", "Turn on Include hidden layers to change those too."]);
+});
+
+test("a scan that fails explains itself without talking about undo", () => {
+  const view = scanErrorView("The node with id 1:2 does not exist");
+  assert.equal(view.canScramble, false);
+  assert.deepEqual(view.details, ["The node with id 1:2 does not exist"]);
 });
 
 test("explains how to unblock text that was all skipped", () => {
-  const view = summaryView(scan({ eligible: [], characters: 0, textLayers: 4, skipped: { hidden: 3, locked: 0, missingFont: 1 } }));
+  const view = summaryView(scan({ eligible: [], characters: 0, textLayers: 4, skipped: { hidden: 3, missingFont: 1 } }));
   assert.equal(view.tone, "warning");
   assert.equal(view.headline, "All 4 text layers skipped");
   assert.deepEqual(view.details, [
     "Skipped: 3 hidden and 1 with missing fonts.",
-    "Turn on Include hidden and locked to change those too.",
+    "Turn on Include hidden layers to change those too.",
     "Text with missing fonts can’t be edited. Install the fonts, then run it again.",
   ]);
   assert.equal(view.canScramble, false);
@@ -67,7 +92,7 @@ test("points to the numbers switch when only numbers are left", () => {
 });
 
 test("a clean run reports, offers undo and closes by itself", () => {
-  const view = resultView(report(), scan({ skipped: { hidden: 1, locked: 0, missingFont: 0 } }));
+  const view = resultView(report(), scan({ skipped: { hidden: 1, missingFont: 0 } }));
   assert.equal(view.tone, "success");
   assert.equal(view.headline, "Scrambled 3 layers · 1,204 characters");
   assert.equal(view.toast, "Scrambled 3 text layers · skipped 1 hidden");

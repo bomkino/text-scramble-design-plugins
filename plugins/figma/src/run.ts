@@ -62,7 +62,10 @@ export async function scrambleLayers(layers: readonly TextLayer[], options: RunO
   // the same invented word everywhere in this run. Names go last so they never change the text output.
   const scrambler = createScrambler({ scrambleNumbers: options.scrambleNumbers, seed: options.seed, random: options.random });
   const outputs = originals.map((text) => scrambler.scramble(text));
-  const renamedTo = new Map(renameIndexes.map((index) => [index, scrambler.scramble(names[index])]));
+  // A name that is an exact copy of its text takes the text's output, so even its numbers match.
+  const renamedTo = new Map(
+    renameIndexes.map((index) => [index, names[index] === originals[index] ? outputs[index] : scrambler.scramble(names[index])]),
+  );
 
   const fontsByLayer = layers.map((layer, index) => {
     try {
@@ -91,29 +94,34 @@ export async function scrambleLayers(layers: readonly TextLayer[], options: RunO
 
   layers.forEach((layer, index) => {
     try {
-      const fonts = fontsByLayer[index];
-      if (fonts instanceof Error) throw fonts;
-      const unavailable = fonts.find((font) => unavailableFonts.has(fontKey(font)));
-      if (unavailable) throw new Error(`The font “${unavailable.family} ${unavailable.style}” didn’t load.`);
-
-      if (layer.characters === originals[index]) {
-        replaceCharactersPreservingStyles(layer, outputs[index]);
-      } else {
+      // Text that already changed came from its main component, scrambled earlier in this run.
+      if (layer.characters !== originals[index]) {
         report.inherited++;
+      } else {
+        const fonts = fontsByLayer[index];
+        if (fonts instanceof Error) throw fonts;
+        const unavailable = fonts.find((font) => unavailableFonts.has(fontKey(font)));
+        if (unavailable) throw new Error(`The font “${unavailable.family} ${unavailable.style}” didn’t load.`);
+        replaceCharactersPreservingStyles(layer, outputs[index]);
       }
-
-      const newName = renamedTo.get(index);
-      if (newName !== undefined && layer.name === names[index]) {
-        layer.name = newName;
-        if (autoRenames[index]) layer.autoRename = true;
-        report.renamed++;
-      }
-
-      report.layers++;
-      report.characters += Array.from(originals[index]).length;
-      changed.push(index);
     } catch (error) {
       report.failed.push({ id: layer.id, name: layer.name, reason: describeError(error) });
+      return;
+    }
+
+    report.layers++;
+    report.characters += Array.from(originals[index]).length;
+    changed.push(index);
+
+    // The text is already changed, so a name Figma won't take never counts the layer as failed.
+    const newName = renamedTo.get(index);
+    if (newName === undefined || layer.name !== names[index]) return;
+    try {
+      layer.name = newName;
+      if (autoRenames[index]) layer.autoRename = true;
+      report.renamed++;
+    } catch {
+      // Keep the old name rather than fail a layer whose text did change.
     }
   });
 

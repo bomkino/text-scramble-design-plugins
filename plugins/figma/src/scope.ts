@@ -43,12 +43,12 @@ export interface ScanOptions {
 
 export interface SkipCounts {
   hidden: number;
-  locked: number;
   missingFont: number;
 }
 
 export interface ScanResult {
   scope: Scope;
+  includeHidden: boolean;
   roots: number;
   textLayers: number;
   // Ready to scramble, in write order: main components before instances, so text an instance
@@ -58,6 +58,9 @@ export interface ScanResult {
   skipped: SkipCounts;
   // Layers that hold only numbers while "Scramble numbers" is off.
   numbersOnly: number;
+  // Eligible layers that are locked, or inside something locked. Figma's lock only stops canvas edits:
+  // locked text still shows and exports, so it is scrambled, and the panel says so.
+  locked: number;
   // Eligible layers inside a main component. Changing them also changes that component's instances.
   inMainComponents: number;
 }
@@ -123,15 +126,18 @@ export function sortByLayerOrder<T extends TreeNode>(nodes: readonly T[]): T[] {
     return indexes.get(child.id) ?? -1;
   };
 
-  const pathOf = (node: TreeNode): number[] => {
-    const path: number[] = [];
-    let current = node;
-    while (current.parent) {
-      path.unshift(indexIn(current.parent, current));
-      current = current.parent;
-    }
-    return path;
-  };
+  // Figma refuses to read hidden layers inside instances while they are skipped. Those sort first, and
+  // scanScope counts them as hidden.
+  const pathOf = (node: TreeNode): number[] =>
+    safely(() => {
+      const path: number[] = [];
+      let current = node;
+      while (current.parent) {
+        path.unshift(indexIn(current.parent, current));
+        current = current.parent;
+      }
+      return path;
+    }, []);
 
   return nodes
     .map((node, order) => ({ node, order, path: pathOf(node) }))
@@ -150,11 +156,12 @@ function safely<T>(read: () => T, fallback: T): T {
 export function scanScope(scope: Scope, roots: readonly TreeNode[], options: ScanOptions): ScanResult {
   const ancestry = createAncestryLookup();
   const seen = new Set<string>();
-  const skipped: SkipCounts = { hidden: 0, locked: 0, missingFont: 0 };
+  const skipped: SkipCounts = { hidden: 0, missingFont: 0 };
   const ready: { layer: TextLayer; depth: number }[] = [];
   let textLayers = 0;
   let characters = 0;
   let numbersOnly = 0;
+  let locked = 0;
   let inMainComponents = 0;
 
   for (const root of sortByLayerOrder(roots)) {
@@ -177,10 +184,6 @@ export function scanScope(scope: Scope, roots: readonly TreeNode[], options: Sca
         skipped.hidden++;
         continue;
       }
-      if (!options.includeHidden && place.locked) {
-        skipped.locked++;
-        continue;
-      }
       if (layer.hasMissingFont) {
         skipped.missingFont++;
         continue;
@@ -194,6 +197,7 @@ export function scanScope(scope: Scope, roots: readonly TreeNode[], options: Sca
 
       ready.push({ layer, depth: place.instanceDepth });
       characters += Array.from(text).length;
+      if (place.locked) locked++;
       if (place.inMainComponent) inMainComponents++;
     }
   }
@@ -201,5 +205,5 @@ export function scanScope(scope: Scope, roots: readonly TreeNode[], options: Sca
   // Array.prototype.sort is stable, so layers keep layer order within each instance depth.
   const eligible = ready.sort((a, b) => a.depth - b.depth).map((entry) => entry.layer);
 
-  return { scope, roots: roots.length, textLayers, eligible, characters, skipped, numbersOnly, inMainComponents };
+  return { scope, includeHidden: options.includeHidden, roots: roots.length, textLayers, eligible, characters, skipped, numbersOnly, locked, inMainComponents };
 }

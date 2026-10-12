@@ -1,4 +1,4 @@
-import { DEFAULT_PREFERENCES, errorView, readPreferences, resultView, summaryView, type Preferences } from "./copy";
+import { DEFAULT_PREFERENCES, errorView, readPreferences, resultView, scanErrorView, summaryView, type Preferences } from "./copy";
 import { debounce } from "./debounce";
 import { scrambleLayers, type RunOptions } from "./run";
 import { scanScope, type ScanResult, type TextLayer } from "./scope";
@@ -34,7 +34,7 @@ async function sendSummary(): Promise<void> {
     const view = summaryView(await scanCurrentScope());
     if (request === scanRequest) figma.ui.postMessage({ type: "summary", view });
   } catch (error) {
-    if (request === scanRequest) figma.ui.postMessage({ type: "summary-error", view: errorView(describeError(error)) });
+    if (request === scanRequest) figma.ui.postMessage({ type: "summary", view: scanErrorView(describeError(error)) });
   }
 }
 
@@ -85,6 +85,7 @@ async function scramble(): Promise<void> {
     figma.ui.postMessage({ type: "result", view });
     if (view.closeAutomatically) {
       isClosing = true;
+      refreshSoon.cancel();
       setTimeout(() => figma.closePlugin(), 1100);
     }
   } catch (error) {
@@ -93,14 +94,20 @@ async function scramble(): Promise<void> {
     figma.ui.postMessage({ type: "result", view: { ...view, problems: [], canSelectWrapped: false, closeAutomatically: false } });
   } finally {
     isScrambling = false;
+    // Scope changes and page switches made during the run were not scanned, so catch up now.
+    if (!isClosing) refreshSoon();
   }
 }
 
 function selectWrapped(): void {
   const layers = wrappedLayers.filter((layer) => !("removed" in layer && layer.removed));
   if (layers.length === 0) return;
-  figma.currentPage.selection = layers as unknown as SceneNode[];
-  figma.viewport.scrollAndZoomIntoView(layers as unknown as SceneNode[]);
+  try {
+    figma.currentPage.selection = layers as unknown as SceneNode[];
+    figma.viewport.scrollAndZoomIntoView(layers as unknown as SceneNode[]);
+  } catch (error) {
+    figma.notify(`Couldn’t select those layers: ${describeError(error)}`, { error: true });
+  }
 }
 
 type UiMessage =
@@ -128,7 +135,7 @@ figma.ui.onmessage = async (message: UiMessage) => {
         next.includeHidden !== preferences.includeHidden;
       preferences = next;
       await figma.clientStorage.setAsync(STORAGE_KEY, preferences);
-      if (rescan && !isScrambling) await sendSummary();
+      if (rescan && !isScrambling && !isClosing) await sendSummary();
       return;
     }
     case "scramble":
@@ -149,10 +156,12 @@ figma.ui.onmessage = async (message: UiMessage) => {
 };
 
 figma.on("selectionchange", () => {
-  if (!isScrambling && preferences.scope === "selection") refreshSoon();
+  if (!isScrambling && !isClosing && preferences.scope === "selection") refreshSoon();
 });
 
 figma.on("currentpagechange", () => {
+  // The wrapped layers belong to the page the run was on.
+  wrappedLayers = [];
   postPage();
-  if (!isScrambling) refreshSoon();
+  if (!isScrambling && !isClosing) refreshSoon();
 });

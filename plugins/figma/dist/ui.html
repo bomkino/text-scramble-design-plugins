@@ -336,7 +336,7 @@
 
           <div class="option-row">
             <div>
-              <span class="option-title" id="hidden-title">Include hidden and locked</span>
+              <span class="option-title" id="hidden-title">Include hidden layers</span>
               <span class="option-copy">Hidden text still lives in the file.</span>
             </div>
             <label class="switch">
@@ -502,9 +502,11 @@
 
         if (message.type === "page") {
           pageCopy.textContent = message.name ? `All text on “${message.name}”.` : "All text on this page.";
+          // A result describes the page it ran on, and its buttons act there.
+          if (!working && !closing) hideResult();
         }
 
-        if (message.type === "summary" || message.type === "summary-error") {
+        if (message.type === "summary") {
           showSummary(message.view);
         }
 

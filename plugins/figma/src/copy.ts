@@ -36,7 +36,6 @@ function joinList(items: readonly string[]): string {
 export function skippedParts(skipped: SkipCounts): string[] {
   const parts: string[] = [];
   if (skipped.hidden) parts.push(`${skipped.hidden.toLocaleString("en-US")} hidden`);
-  if (skipped.locked) parts.push(`${skipped.locked.toLocaleString("en-US")} locked`);
   if (skipped.missingFont) parts.push(`${skipped.missingFont.toLocaleString("en-US")} with missing fonts`);
   return parts;
 }
@@ -52,12 +51,12 @@ export interface SummaryView {
 }
 
 function skippedTotal(skipped: SkipCounts): number {
-  return skipped.hidden + skipped.locked + skipped.missingFont;
+  return skipped.hidden + skipped.missingFont;
 }
 
 function skipHints(scan: ScanResult): string[] {
   const hints: string[] = [];
-  if (scan.skipped.hidden || scan.skipped.locked) hints.push("Turn on Include hidden and locked to change those too.");
+  if (scan.skipped.hidden) hints.push("Turn on Include hidden layers to change those too.");
   if (scan.skipped.missingFont) hints.push("Text with missing fonts can’t be edited. Install the fonts, then run it again.");
   if (scan.numbersOnly) {
     hints.push(`${plural(scan.numbersOnly, "layer")} only ${scan.numbersOnly === 1 ? "has" : "have"} numbers. Turn on Scramble numbers to change them.`);
@@ -79,11 +78,13 @@ export function summaryView(scan: ScanResult): SummaryView {
   }
 
   if (scan.textLayers === 0) {
+    // While hidden layers are skipped, Figma doesn't even list hidden text inside instances.
+    const hiddenHint = scan.includeHidden ? [] : ["Hidden text isn’t counted. Turn on Include hidden layers to look for it."];
     return {
       tone: "neutral",
-      headline: `No text ${place}`,
+      headline: scan.includeHidden ? `No text ${place}` : `No visible text ${place}`,
       count: "0 layers",
-      details: scan.scope === "selection" ? ["Select layers that contain text."] : [],
+      details: [...(scan.scope === "selection" ? ["Select layers that contain text."] : []), ...hiddenHint],
       canScramble: false,
     };
   }
@@ -92,7 +93,7 @@ export function summaryView(scan: ScanResult): SummaryView {
     const skipped = skippedTotal(scan.skipped);
     return {
       tone: "warning",
-      headline: skipped ? `All ${plural(scan.textLayers, "text layer")} skipped` : "Nothing here to change",
+      headline: skipped === scan.textLayers ? `All ${plural(scan.textLayers, "text layer")} skipped` : "Nothing here to change",
       count: "0 layers",
       details: [
         ...(skipped ? [`Skipped: ${joinList(skippedParts(scan.skipped))}.`] : []),
@@ -105,9 +106,14 @@ export function summaryView(scan: ScanResult): SummaryView {
   const details: string[] = [];
   const parts = skippedParts(scan.skipped);
   if (parts.length) details.push(`Skipping ${joinList(parts)}.`);
+  if (scan.locked) {
+    details.push(`Includes ${plural(scan.locked, "locked layer")}. Locked text still shows in exports.`);
+  }
   if (scan.inMainComponents) {
     details.push(
-      `${plural(scan.inMainComponents, "layer")} ${scan.inMainComponents === 1 ? "is" : "are"} in a main component, so its instances change too, even on other pages.`,
+      scan.inMainComponents === 1
+        ? "1 layer is in a main component, so its instances change too, even on other pages."
+        : `${plural(scan.inMainComponents, "layer")} are in main components, so their instances change too, even on other pages.`,
     );
   }
 
@@ -178,4 +184,8 @@ export function resultView(report: RunReport, scan: ScanResult): ResultView {
 
 export function errorView(detail: string): { tone: Tone; headline: string; details: string[] } {
   return { tone: "error", headline: "Something went wrong", details: [detail, "If anything changed, Undo puts it back."] };
+}
+
+export function scanErrorView(detail: string): SummaryView {
+  return { tone: "error", headline: "Couldn’t read the layers", count: "—", details: [detail], canScramble: false };
 }
