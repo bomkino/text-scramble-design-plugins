@@ -4,7 +4,7 @@
 // The InDesign objects come in through `host`, so the whole run can be tested with fake documents.
 
 import { buildReplacementRuns } from "../../../packages/core/src/replacement-runs";
-import { hasScramblableText, scrambleTexts } from "../../../packages/core/src/scramble-text";
+import { createScrambler, createWordMatcher, hasScramblableText } from "../../../packages/core/src/scramble-text";
 import { cleanDocument, documentNames, type CleanupReport } from "./cleanup";
 import {
   activeDocument,
@@ -17,7 +17,7 @@ import {
   type TargetKind,
   type TextTarget,
 } from "./collect";
-import { applyKeepPlan, keepPlan, type KeepRules } from "./keep-readable";
+import { keepPlan, scrambleSegments, type KeepRules } from "./keep-readable";
 import { overflowReport, snapshotOverflow, type OverflowReport } from "./overflow";
 
 export type { Scope } from "./collect";
@@ -36,6 +36,8 @@ export interface RunOptions extends KeepRules {
   includeHidden?: boolean;
   /** Point links at example.com, give links neutral names and clear the document info. */
   cleanup?: boolean;
+  /** The same seed gives the same invented words every time, in every app. Empty means random. */
+  seed?: number | string;
 }
 
 export type EmptyReason = "no-document" | "empty-selection" | "nothing-to-scramble" | "all-skipped" | "all-kept";
@@ -200,20 +202,23 @@ export function runScramble(host: InDesignHost, options: RunOptions): ScrambleRe
   const names = options.scope === "document" && document
     ? documentNames(document, host.VariableTypes?.CUSTOM_TEXT_TYPE).filter((name) => hasScramblableText(name.source, { scrambleNumbers }))
     : [];
-  const sources = [...targets.map((target) => target.source), ...names.map((name) => name.source)];
-  const outputs = scrambleTexts(sources, { scrambleNumbers });
+  // One scrambler per run: a word becomes the same invented word in every frame, cell and note.
+  const scrambler = createScrambler({ scrambleNumbers, seed: options.seed });
+  const listed = createWordMatcher(options.alwaysScramble ?? []);
+  const scramble = (text: string, keep: boolean) => (keep ? scrambler.scramble(text, listed) : scrambler.scramble(text));
 
   const writes: Array<{ target: TextTarget; output: string }> = [];
-  targets.forEach((target, index) => {
-    const plan = keepPlan(target.text, target.offset, target.source, options);
+  targets.forEach((target) => {
+    let plan = keepPlan(target.text, target.offset, target.source, options);
     if (plan === null) {
       report.notes.push("Some paragraphs could not be matched to their styles, so they were scrambled in full.");
-    } else {
-      report.keptParagraphs += plan.keptParagraphs;
+      plan = { segments: [{ start: 0, end: codePoints(target.source).length, keep: false }], keptParagraphs: 0 };
     }
-    const output = applyKeepPlan(target.source, outputs[index], plan);
+    report.keptParagraphs += plan.keptParagraphs;
+    const output = scrambleSegments(target.source, plan, scramble);
     if (output !== target.source) writes.push({ target, output });
   });
+  const nameOutputs = names.map((name) => scrambler.scramble(name.source));
 
   report.empty = emptyReason(app, options, writes.length + names.length, report.skipped);
   if (report.empty === "nothing-to-scramble" && targets.length && report.keptParagraphs) report.empty = "all-kept";
@@ -241,7 +246,7 @@ export function runScramble(host: InDesignHost, options: RunOptions): ScrambleRe
       }
       names.forEach((name, index) => {
         try {
-          name.apply(outputs[targets.length + index]);
+          name.apply(nameOutputs[index]);
           report.names++;
         } catch (error) {
           report.errors.push(message(error));

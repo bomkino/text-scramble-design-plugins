@@ -6,13 +6,19 @@ import { codePoints, collectionItems, constructorName } from "./collect";
 export interface KeepRules {
   /** Paragraph style names to leave readable. */
   keepStyles?: readonly string[];
-  /** Words or phrases to scramble everywhere, even inside kept paragraphs. */
+  /** Words to scramble everywhere, even inside kept paragraphs. Case and accents are ignored. */
   alwaysScramble?: readonly string[];
 }
 
+/** A stretch of a target's source, in code points. Kept stretches only scramble listed words. */
+export interface Segment {
+  start: number;
+  end: number;
+  keep: boolean;
+}
+
 export interface KeepPlan {
-  /** One flag per code point of the target's source: true keeps the original character. */
-  keep: boolean[];
+  segments: Segment[];
   keptParagraphs: number;
 }
 
@@ -37,32 +43,6 @@ export function parseWordList(value: string): string[] {
     .filter((entry, index, entries) => entry.length > 0 && entries.indexOf(entry) === index);
 }
 
-function escapeForPattern(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-/** Marks the code points that belong to a listed word or phrase, matched whole and ignoring case. */
-export function forcedMask(source: string, entries: readonly string[]): boolean[] {
-  const characters = codePoints(source);
-  const mask = characters.map(() => false);
-  if (!entries.length) return mask;
-  const codePointAt: number[] = [];
-  characters.forEach((character, index) => {
-    for (let unit = 0; unit < character.length; unit++) codePointAt.push(index);
-  });
-  codePointAt.push(characters.length);
-  for (const entry of entries) {
-    const body = entry.split(" ").map(escapeForPattern).join("\\s+");
-    const pattern = new RegExp(`(?<![\\p{L}\\p{M}\\p{N}])${body}(?![\\p{L}\\p{M}\\p{N}])`, "giu");
-    for (const match of source.matchAll(pattern)) {
-      const start = codePointAt[match.index ?? 0];
-      const end = codePointAt[(match.index ?? 0) + match[0].length];
-      for (let index = start; index < end; index++) mask[index] = true;
-    }
-  }
-  return mask;
-}
-
 interface ParagraphSpan {
   start: number;
   end: number;
@@ -70,20 +50,19 @@ interface ParagraphSpan {
 }
 
 /**
- * Works out which characters of a target sit in kept paragraphs. A target can start or end in the
- * middle of a paragraph (a frame in a threaded story, or a text selection), so the paragraphs are
- * lined up against the target's own text before anything is kept. Returns null when they cannot be
- * lined up; the caller then scrambles the target in full rather than guess.
+ * Splits a target into kept and scrambled stretches. A target can start or end in the middle of a
+ * paragraph (a frame in a threaded story, or a text selection), so the paragraphs are lined up
+ * against the target's own text first. Returns null when they cannot be lined up; the caller then
+ * scrambles the target in full rather than guess.
  */
 export function keepPlan(text: any, offset: number, source: string, rules: KeepRules): KeepPlan | null {
+  const length = codePoints(source).length;
+  const whole: KeepPlan = { segments: [{ start: 0, end: length, keep: false }], keptParagraphs: 0 };
   const keepStyles = new Set(rules.keepStyles ?? []);
-  const sourceCharacters = codePoints(source);
-  const forced = forcedMask(source, rules.alwaysScramble ?? []);
-  const none: KeepPlan = { keep: sourceCharacters.map(() => false), keptParagraphs: 0 };
-  if (!keepStyles.size) return none;
+  if (!keepStyles.size || !length) return whole;
 
   const paragraphs = collectionItems(read(() => text.paragraphs, null));
-  if (!paragraphs.length) return none;
+  if (!paragraphs.length) return whole;
   const spans: ParagraphSpan[] = [];
   const joined: string[] = [];
   for (const paragraph of paragraphs) {
@@ -93,6 +72,7 @@ export function keepPlan(text: any, offset: number, source: string, rules: KeepR
     spans.push({ start: joined.length, end: joined.length + characters.length, keep: keepStyles.has(paragraphStyleName(paragraph)) });
     joined.push(...characters);
   }
+  if (!spans.some((span) => span.keep)) return whole;
 
   const flowText = read(() => text.contents, null);
   if (typeof flowText !== "string") return null;
@@ -114,25 +94,32 @@ export function keepPlan(text: any, offset: number, source: string, rules: KeepR
     if (lead < 0) return null;
   }
 
-  const keep = sourceCharacters.map(() => false);
-  let keptParagraphs = 0;
   const from = lead + offset;
-  const to = from + sourceCharacters.length;
+  const to = from + length;
+  const segments: Segment[] = [];
+  let keptParagraphs = 0;
   for (const span of spans) {
-    if (!span.keep || span.end <= from || span.start >= to) continue;
-    keptParagraphs++;
-    for (let index = Math.max(span.start, from); index < Math.min(span.end, to); index++) {
-      keep[index - from] = !forced[index - from];
-    }
+    const start = Math.max(span.start, from) - from;
+    const end = Math.min(span.end, to) - from;
+    if (end <= start) continue;
+    if (span.keep) keptParagraphs++;
+    const last = segments[segments.length - 1];
+    if (last && last.keep === span.keep && last.end === start) last.end = end;
+    else segments.push({ start, end, keep: span.keep });
   }
-  return { keep, keptParagraphs };
+  if (!segments.length) return whole;
+  // Text past the last paragraph (never expected, but never dropped) is scrambled.
+  const tail = segments[segments.length - 1].end;
+  if (tail < length) segments.push({ start: tail, end: length, keep: false });
+  return { segments, keptParagraphs };
 }
 
-/** Puts kept characters back into the scrambled output. Both strings have the same code points. */
-export function applyKeepPlan(source: string, output: string, plan: KeepPlan | null): string {
-  if (!plan || !plan.keep.some(Boolean)) return output;
-  const sourceCharacters = codePoints(source);
-  return codePoints(output)
-    .map((character, index) => (plan.keep[index] ? sourceCharacters[index] : character))
-    .join("");
+/** Scrambles each stretch: kept stretches only change listed words. */
+export function scrambleSegments(
+  source: string,
+  plan: KeepPlan,
+  scramble: (text: string, keep: boolean) => string,
+): string {
+  const characters = codePoints(source);
+  return plan.segments.map((segment) => scramble(characters.slice(segment.start, segment.end).join(""), segment.keep)).join("");
 }
