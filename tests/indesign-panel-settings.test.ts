@@ -36,7 +36,7 @@ test("remembers every option through a round trip", () => {
     includeHidden: true,
     cleanup: true,
     keepStyles: ["Headline", "Caption"],
-    alwaysScramble: "Northwind, Ada Lovelace",
+    alwaysScramble: "Brindlewick, Amélie Hart",
     seed: "spring-issue",
     keepOpen: true,
   };
@@ -52,7 +52,7 @@ test("ignores bad stored data, field by field", () => {
       includeLocked: false,
       includeHidden: 1,
       keepStyles: ["Headline", 7, "", null, "Headline", "Body"],
-      alwaysScramble: ["Northwind"],
+      alwaysScramble: ["Brindlewick"],
       seed: 42,
       unknown: "ignored",
     }),
@@ -72,7 +72,7 @@ test("turns settings into run options", () => {
     ...defaultSettings(),
     scope: "page" as const,
     keepStyles: ["Headline"],
-    alwaysScramble: "Northwind,  Ada   Lovelace\nNorthwind; Contoso",
+    alwaysScramble: "Brindlewick,  Amélie   Hart\nBrindlewick; Quellmoor",
     seed: "  42  ",
     cleanup: true,
   };
@@ -83,7 +83,7 @@ test("turns settings into run options", () => {
     includeHidden: false,
     cleanup: true,
     keepStyles: ["Headline"],
-    alwaysScramble: ["Northwind", "Ada Lovelace", "Contoso"],
+    alwaysScramble: ["Brindlewick", "Amélie Hart", "Quellmoor"],
     seed: "42",
   });
   // The menu command always scrambles the selection, with the remembered options.

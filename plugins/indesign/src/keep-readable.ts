@@ -35,7 +35,7 @@ export function paragraphStyleName(paragraph: any): string {
   return read(() => String(paragraph.appliedParagraphStyle.name), "");
 }
 
-/** Splits a typed list ("Northwind, Ada Lovelace" or one per line) into clean entries. */
+/** Splits a typed list ("Brindlewick, Amélie Hart" or one per line) into clean entries. */
 export function parseWordList(value: string): string[] {
   return value
     .split(/[\n,;]+/)

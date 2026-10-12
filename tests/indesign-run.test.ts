@@ -31,54 +31,54 @@ function deck() {
   const headline = doc.paragraphStyle("Headline");
   const body = doc.paragraphStyle("Body");
 
-  const nested = doc.table([["Northwind inner cell"]]);
-  const table = doc.table([["Northwind ledger"], ["Quarter", nested], ["Totals 2026"]]);
-  const footnote = doc.footnote("Northwind footnote text.");
-  const anchoredStory = doc.story("Northwind anchored caption");
+  const nested = doc.table([["Brindlewick inner cell"]]);
+  const table = doc.table([["Brindlewick ledger"], ["Quarter", nested], ["Totals 2026"]]);
+  const footnote = doc.footnote("Brindlewick footnote text.");
+  const anchoredStory = doc.story("Brindlewick anchored caption");
   const anchored = doc.anchoredFrame(anchoredStory);
   const article = doc.story([
     headline,
-    "Northwind Annual Review\r",
+    "Brindlewick Annual Review\r",
     body,
-    "Northwind grew in every region. ",
+    "Brindlewick grew in every region. ",
     table,
     " See the note",
     footnote,
     ". ",
     anchored,
-    "\rThe overset tail mentions Northwind once more.",
+    "\rThe overset tail mentions Brindlewick once more.",
   ]);
   const frame1 = doc.frame(page1, article, { capacity: 40 });
   const frame2 = doc.frame(page2, article, { capacity: 30 });
 
-  const footerStory = doc.story("Northwind confidential footer");
+  const footerStory = doc.story("Brindlewick confidential footer");
   const footer = doc.frame(parent.pages[0], footerStory);
 
-  const pasteboardStory = doc.story("Northwind pasteboard note");
+  const pasteboardStory = doc.story("Brindlewick pasteboard note");
   doc.frame(spread, pasteboardStory);
 
-  const hiddenStory = doc.story("Hidden Northwind alternate");
+  const hiddenStory = doc.story("Hidden Brindlewick alternate");
   const hidden = doc.frame(page1, hiddenStory);
   hidden.visible = false;
 
   const lockedLayer = doc.layer("Locked furniture");
   lockedLayer.setLockedForTest(true);
-  const slugStory = doc.story("Northwind slug line");
+  const slugStory = doc.story("Brindlewick slug line");
   const slug = doc.frame(page2, slugStory, { layer: lockedLayer });
 
-  const lockedFrameStory = doc.story("Northwind locked frame");
+  const lockedFrameStory = doc.story("Brindlewick locked frame");
   const lockedFrame = doc.frame(page1, lockedFrameStory);
   lockedFrame.setLockedForTest(true);
 
   const circle = doc.shape(page1);
-  const pathStory = doc.story("Northwind around a circle");
+  const pathStory = doc.story("Brindlewick around a circle");
   doc.textPath(circle, pathStory);
 
   const group = doc.group(page2);
-  const groupedStory = doc.story("Northwind grouped caption");
+  const groupedStory = doc.story("Brindlewick grouped caption");
   const grouped = doc.frame(group, groupedStory);
 
-  const unlistedStory = doc.story("Northwind unlisted story");
+  const unlistedStory = doc.story("Brindlewick unlisted story");
   doc.frame(page2, unlistedStory);
   doc.unlistedStories.add(unlistedStory);
 
@@ -216,9 +216,9 @@ test("page: every frame on the active page, plus overset text, and nothing else"
   assert.notEqual(frame2.texts.item(0)!.contents, frame2Before);
   assert.notEqual(article.contents.slice(oversetStart), storyBefore.slice(oversetStart), "overset text changed");
   assert.equal(report.kinds.overset, 1);
-  assert.notEqual(slugStory.contents, "Northwind slug line", "locked layer is included by default");
-  assert.notEqual(groupedStory.contents, "Northwind grouped caption", "grouped frames are included");
-  assert.equal(footerStory.contents, "Northwind confidential footer", "parent pages are not part of a page run");
+  assert.notEqual(slugStory.contents, "Brindlewick slug line", "locked layer is included by default");
+  assert.notEqual(groupedStory.contents, "Brindlewick grouped caption", "grouped frames are included");
+  assert.equal(footerStory.contents, "Brindlewick confidential footer", "parent pages are not part of a page run");
 });
 
 test("document: reaches every story, table, footnote, path and parent page", () => {
@@ -226,11 +226,11 @@ test("document: reaches every story, table, footnote, path and parent page", () 
   const report = run(f.app, { scope: "document", seed: 5 });
 
   for (const story of [f.article, f.footerStory, f.pasteboardStory, f.slugStory, f.lockedFrameStory, f.pathStory, f.groupedStory, f.unlistedStory, f.anchoredStory]) {
-    assert.ok(!story.contents.includes("Northwind"), `still readable: ${story.contents}`);
+    assert.ok(!story.contents.includes("Brindlewick"), `still readable: ${story.contents}`);
   }
-  for (const cell of [...f.table.rows, ...f.nested.rows]) assert.ok(!cell.contents.includes("Northwind"), cell.contents);
-  assert.ok(!f.footnote.flow.text(0, 99).includes("Northwind"));
-  assert.equal(f.hiddenStory.contents, "Hidden Northwind alternate", "hidden items are skipped by default");
+  for (const cell of [...f.table.rows, ...f.nested.rows]) assert.ok(!cell.contents.includes("Brindlewick"), cell.contents);
+  assert.ok(!f.footnote.flow.text(0, 99).includes("Brindlewick"));
+  assert.equal(f.hiddenStory.contents, "Hidden Brindlewick alternate", "hidden items are skipped by default");
   assert.equal(report.skipped.hidden, 1);
   assert.equal(report.skipped.locked, 0);
   assert.ok(report.parentPages >= 1);
@@ -246,22 +246,22 @@ test("document: locked layers and frames are unlocked for the edit and locked ag
   run(f.app, { scope: "document", seed: 6 });
   assert.equal(f.lockedLayer.locked, true);
   assert.equal(f.lockedFrame.locked, true);
-  assert.notEqual(f.slugStory.contents, "Northwind slug line");
-  assert.notEqual(f.lockedFrameStory.contents, "Northwind locked frame");
+  assert.notEqual(f.slugStory.contents, "Brindlewick slug line");
+  assert.notEqual(f.lockedFrameStory.contents, "Brindlewick locked frame");
 });
 
 test("document: locked items can be left alone, and are counted", () => {
   const f = deck();
   const lockedGroup = f.document.group(f.page2);
   lockedGroup.setLockedForTest(true);
-  const inLockedGroup = f.document.story("Northwind in a locked group");
+  const inLockedGroup = f.document.story("Brindlewick in a locked group");
   f.document.frame(lockedGroup, inLockedGroup);
 
   const report = run(f.app, { scope: "document", includeLocked: false, seed: 6 });
 
-  assert.equal(f.slugStory.contents, "Northwind slug line");
-  assert.equal(f.lockedFrameStory.contents, "Northwind locked frame");
-  assert.equal(inLockedGroup.contents, "Northwind in a locked group");
+  assert.equal(f.slugStory.contents, "Brindlewick slug line");
+  assert.equal(f.lockedFrameStory.contents, "Brindlewick locked frame");
+  assert.equal(inLockedGroup.contents, "Brindlewick in a locked group");
   assert.equal(report.skipped.locked, 3);
   assert.equal(f.lockedLayer.locked, true);
 });
@@ -269,16 +269,16 @@ test("document: locked items can be left alone, and are counted", () => {
 test("document: hidden items can be included", () => {
   const f = deck();
   const report = run(f.app, { scope: "document", includeHidden: true, seed: 8 });
-  assert.notEqual(f.hiddenStory.contents, "Hidden Northwind alternate");
+  assert.notEqual(f.hiddenStory.contents, "Hidden Brindlewick alternate");
   assert.equal(report.skipped.hidden, 0);
 });
 
 test("one word cache per run: a name becomes the same invented word everywhere", () => {
   const f = deck();
-  f.document.bookmark("Northwind");
+  f.document.bookmark("Brindlewick");
   run(f.app, { scope: "document", seed: 9 });
   const invented = words(f.footerStory.contents)[0];
-  assert.notEqual(invented, "Northwind");
+  assert.notEqual(invented, "Brindlewick");
   for (const text of [f.article.contents, f.table.rows[0].contents, f.nested.rows[0].contents, f.footnote.flow.text(0, 99), f.pathStory.contents, f.document.bookmarkList[0].name]) {
     assert.equal(words(text).filter((word) => word === invented).length > 0, true, `${invented} missing from ${text}`);
   }
@@ -297,10 +297,10 @@ test("seed: the same seed gives the same document, a different seed does not", (
 
 test("keep readable: kept paragraph styles stay, listed words still change", () => {
   const f = deck();
-  const report = run(f.app, { scope: "document", keepStyles: ["Headline"], alwaysScramble: ["northwind"], seed: 10 });
+  const report = run(f.app, { scope: "document", keepStyles: ["Headline"], alwaysScramble: ["brindlewick"], seed: 10 });
   const headline = f.article.contents.split("\r")[0];
   assert.match(headline, /^\p{L}+ Annual Review$/u);
-  assert.ok(!headline.startsWith("Northwind"));
+  assert.ok(!headline.startsWith("Brindlewick"));
   assert.equal(words(headline)[0], words(f.footerStory.contents)[0], "same invented word as elsewhere");
   assert.ok(!f.article.contents.includes("grew in every region"));
   assert.equal(report.keptParagraphs, 1);
@@ -308,10 +308,10 @@ test("keep readable: kept paragraph styles stay, listed words still change", () 
 
 test("keep readable: bookmarks and anchors follow the rule, variables scramble in full", () => {
   const f = deck();
-  const bookmark = f.document.bookmark("Northwind Annual Review");
-  const anchor = f.document.anchor("Northwind Annual Review");
-  const client = f.document.variable("Client", "Northwind Traders");
-  run(f.app, { scope: "document", keepStyles: ["Headline"], alwaysScramble: ["Northwind"], seed: 10 });
+  const bookmark = f.document.bookmark("Brindlewick Annual Review");
+  const anchor = f.document.anchor("Brindlewick Annual Review");
+  const client = f.document.variable("Client", "Brindlewick Traders");
+  run(f.app, { scope: "document", keepStyles: ["Headline"], alwaysScramble: ["Brindlewick"], seed: 10 });
   const headline = f.article.contents.split("\r")[0];
   assert.equal(bookmark.name, headline);
   assert.equal(anchor.name, headline);
@@ -393,9 +393,9 @@ test("overflow report: names the pages of frames and cells that now overflow", (
 
 test("cleanup: links point at example.com, names go neutral, document info clears", () => {
   const f = deck();
-  f.document.link("https://northwind.invalid/annual", "https://northwind.invalid/annual");
-  f.document.link("mailto:press@northwind.invalid", "mailto:press@northwind.invalid");
-  f.document.pageLink("Northwind page 3");
+  f.document.link("https://brindlewick.invalid/annual", "https://brindlewick.invalid/annual");
+  f.document.link("mailto:press@brindlewick.invalid", "mailto:press@brindlewick.invalid");
+  f.document.pageLink("Brindlewick page 3");
 
   const report = run(f.app, { scope: "document", cleanup: true, seed: 13 });
 
@@ -412,18 +412,18 @@ test("cleanup: links point at example.com, names go neutral, document info clear
   assert.deepEqual(f.document.metadataPreferences.keywords, []);
   assert.deepEqual(report.cleanup, { links: 2, renamed: 5, documentInfo: true });
   const everyAddress = f.document.urlDestinations.map((destination) => destination.destinationURL).join(" ");
-  assert.ok(!/northwind/i.test(everyAddress));
+  assert.ok(!/brindlewick/i.test(everyAddress));
 });
 
 test("cleanup is off by default and works on its own", () => {
   const f = deck();
-  const link = f.document.link("https://northwind.invalid/", "https://northwind.invalid/");
+  const link = f.document.link("https://brindlewick.invalid/", "https://brindlewick.invalid/");
   run(f.app, { scope: "document", seed: 14 });
-  assert.equal(link.destinationURL, "https://northwind.invalid/");
+  assert.equal(link.destinationURL, "https://brindlewick.invalid/");
   assert.equal(f.document.metadataPreferences.author, "Sample Author");
 
   const { app, document } = createInDesign();
-  const lone = document.link("https://northwind.invalid/", "https://northwind.invalid/");
+  const lone = document.link("https://brindlewick.invalid/", "https://brindlewick.invalid/");
   app.selection = [];
   const report = run(app, { scope: "selection", cleanup: true });
   assert.equal(lone.destinationURL, "https://example.com/link-1");
@@ -432,35 +432,35 @@ test("cleanup is off by default and works on its own", () => {
 
 test("document names: bookmarks, anchors and custom variables follow the scramble", () => {
   const f = deck();
-  const chapter = f.document.bookmark("Northwind results");
+  const chapter = f.document.bookmark("Brindlewick results");
   const child = f.document.bookmark("Regional detail", chapter);
-  const web = f.document.bookmark("www.northwind.invalid");
-  const anchor = f.document.anchor("Northwind results anchor");
-  const client = f.document.variable("Client", "Northwind Traders");
-  const fileName = f.document.variable("File", "northwind-deck.indd", VariableTypes.FILE_NAME_TYPE);
+  const web = f.document.bookmark("www.brindlewick.invalid");
+  const anchor = f.document.anchor("Brindlewick results anchor");
+  const client = f.document.variable("Client", "Brindlewick Traders");
+  const fileName = f.document.variable("File", "brindlewick-deck.indd", VariableTypes.FILE_NAME_TYPE);
 
   const report = run(f.app, { scope: "document", seed: 15 });
 
-  assert.notEqual(chapter.name, "Northwind results");
+  assert.notEqual(chapter.name, "Brindlewick results");
   assert.notEqual(child.name, "Regional detail");
-  assert.equal(web.name, "www.northwind.invalid", "address-like names are never scrambled into new addresses");
-  assert.notEqual(anchor.name, "Northwind results anchor");
-  assert.notEqual(client.variableOptions.contents, "Northwind Traders");
-  assert.equal(fileName.variableOptions.contents, "northwind-deck.indd");
+  assert.equal(web.name, "www.brindlewick.invalid", "address-like names are never scrambled into new addresses");
+  assert.notEqual(anchor.name, "Brindlewick results anchor");
+  assert.notEqual(client.variableOptions.contents, "Brindlewick Traders");
+  assert.equal(fileName.variableOptions.contents, "brindlewick-deck.indd");
   assert.equal(report.names, 4);
 
   const page = deck();
-  const pageBookmark = page.document.bookmark("Northwind results");
+  const pageBookmark = page.document.bookmark("Brindlewick results");
   run(page.app, { scope: "page", seed: 15 });
-  assert.equal(pageBookmark.name, "Northwind results", "names only change in a Whole document run");
+  assert.equal(pageBookmark.name, "Brindlewick results", "names only change in a Whole document run");
 });
 
 test("text that does not line up character for character is left alone", () => {
   const { app, document, world } = createInDesign();
   const page = document.spread(["1"]).pages[0];
-  const story = document.story("Northwind special characters");
+  const story = document.story("Brindlewick special characters");
   document.frame(page, story);
-  Object.defineProperty(story, "contents", { get: () => "Northwind special characters plus" });
+  Object.defineProperty(story, "contents", { get: () => "Brindlewick special characters plus" });
   const report = run(app, { scope: "document" });
   assert.equal(report.skipped.unreadable, 1);
   assert.equal(world.writes, 0);
@@ -470,7 +470,7 @@ test("text that does not line up character for character is left alone", () => {
 test("overset text that cannot be lined up is skipped, not guessed", () => {
   const { app, document } = createInDesign();
   const page = document.spread(["1"]).pages[0];
-  const story = document.story("Northwind text that is far too long for its little frame.");
+  const story = document.story("Brindlewick text that is far too long for its little frame.");
   const frame = document.frame(page, story, { capacity: 10 });
   const real = frame.texts.item(0)!;
   Object.defineProperty(frame, "texts", { get: () => new Collection(() => [Object.create(real, { index: { value: real.index + 1 } })]) });
@@ -487,8 +487,8 @@ test("a failed edit is reported, the rest still runs, and locks come back", () =
   };
   const report = run(f.app, { scope: "document", seed: 17 });
   assert.deepEqual(report.errors, ["Story is checked out to InCopy."]);
-  assert.equal(f.footerStory.contents, "Northwind confidential footer");
-  assert.ok(!f.pathStory.contents.includes("Northwind"));
+  assert.equal(f.footerStory.contents, "Brindlewick confidential footer");
+  assert.ok(!f.pathStory.contents.includes("Brindlewick"));
   assert.equal(f.lockedLayer.locked, true);
 });
 
@@ -516,7 +516,7 @@ test("no document open", () => {
 test("only hidden text in scope", () => {
   const { app, document } = createInDesign();
   const page = document.spread(["1"]).pages[0];
-  document.frame(page, document.story("Northwind")).visible = false;
+  document.frame(page, document.story("Brindlewick")).visible = false;
   app.activeWindow.activePage = page;
   assert.equal(run(app, { scope: "page" }).empty, "all-skipped");
 });
@@ -533,8 +533,8 @@ test("paragraph style names are unique and reveal selects without editing", () =
 });
 
 test("word lists and address detection", () => {
-  assert.deepEqual(parseWordList(" Northwind, Ada  Lovelace\nZoë;Northwind,, "), ["Northwind", "Ada Lovelace", "Zoë"]);
-  for (const address of ["hello@northwind.invalid", "https://northwind.invalid", "www.northwind", "northwind.com"]) {
+  assert.deepEqual(parseWordList(" Brindlewick, Amélie  Hart\nZoë;Brindlewick,, "), ["Brindlewick", "Amélie Hart", "Zoë"]);
+  for (const address of ["hello@brindlewick.invalid", "https://brindlewick.invalid", "www.brindlewick", "brindlewick.com"]) {
     assert.equal(looksLikeAddress(address), true, address);
   }
   for (const name of ["Annual Review", "Chapter 1. Overview", "Q3 results"]) assert.equal(looksLikeAddress(name), false, name);

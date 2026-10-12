@@ -13,7 +13,7 @@ import type { EmptyReason, KindCounts, RunOptions, Scope, ScopeSummary, Scramble
 export const SCOPES: ReadonlyArray<{ scope: Scope; title: string; copy: string }> = [
   { scope: "selection", title: "Selection", copy: "Text, frames or table cells" },
   { scope: "page", title: "Page", copy: "Every frame on this page, overset text included" },
-  { scope: "document", title: "Document", copy: "Every story, table, footnote and parent page" },
+  { scope: "document", title: "Document", copy: "Every story, table, footnote, parent page and bookmark" },
 ];
 
 export const UNDO_HINT = "Edit > Undo Text Scramble puts it all back in one step.";

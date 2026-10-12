@@ -95,7 +95,7 @@ function sampleDocument() {
   const body = document.paragraphStyle("Body Copy");
   const [page] = document.spread(["1"]).pages;
   app.activeWindow.activePage = page;
-  const story = document.story([headline, "Northwind spring catalogue\r", body, "Fresh produce from local farms, delivered daily."]);
+  const story = document.story([headline, "Brindlewick spring catalogue\r", body, "Fresh produce from local farms, delivered daily."]);
   document.frame(page, story);
   return { app, document, story, page };
 }
@@ -127,7 +127,7 @@ test("offers the three scopes and every option, starting on Page when nothing is
   assert.deepEqual(scope.stringList, [
     "Selection — Text, frames or table cells",
     "Page — Every frame on this page, overset text included",
-    "Document — Every story, table, footnote and parent page",
+    "Document — Every story, table, footnote, parent page and bookmark",
   ]);
   assert.equal(scope.selectedIndex, 1);
   assert.deepEqual(
@@ -147,14 +147,14 @@ test("runs with the chosen options and reports in plain words", async () => {
   const messages = await runScript(app, [
     (controls) => {
       control(controls, "textEditbox", undefined, 0).editContents = "headline, Headlin";
-      control(controls, "textEditbox", undefined, 1).editContents = "Northwind";
+      control(controls, "textEditbox", undefined, 1).editContents = "Brindlewick";
       control(controls, "textEditbox", undefined, 2).editContents = " 7 ";
       return true;
     },
   ]);
   assert.equal(app.doScriptCalls.length, 1);
   assert.match(story.contents, /^\S+ spring catalogue\r/);
-  assert.ok(!story.contents.startsWith("Northwind"));
+  assert.ok(!story.contents.startsWith("Brindlewick"));
   assert.ok(!story.contents.includes("Fresh produce"));
   assert.equal(messages.length, 1);
   const message = messages[0].join(" ");

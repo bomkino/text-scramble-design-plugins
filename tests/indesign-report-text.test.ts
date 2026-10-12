@@ -301,7 +301,7 @@ test("keeps the three scopes in panel order with their approved copy", () => {
     [
       ["selection", "Selection", "Text, frames or table cells"],
       ["page", "Page", "Every frame on this page, overset text included"],
-      ["document", "Document", "Every story, table, footnote and parent page"],
+      ["document", "Document", "Every story, table, footnote, parent page and bookmark"],
     ],
   );
 });
@@ -312,7 +312,7 @@ test("describes real summaries and reports from the run", () => {
   const spread = document.spread(["1", "2"]);
   const [page] = spread.pages;
   app.activeWindow.activePage = page;
-  document.frame(page, document.story("Northwind Traders ships fresh produce daily."));
+  document.frame(page, document.story("Brindlewick Traders ships fresh produce daily."));
   document.frame(page, document.story(["Quarterly report", document.table(["North", "South", "East", "West"])]));
   const hidden = document.frame(page, document.story("A note nobody should print."));
   hidden.visible = false;
