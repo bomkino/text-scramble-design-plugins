@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import vm from "node:vm";
 import { parse } from "acorn";
 import { build } from "esbuild";
+import { createExtendScriptContext, es3Problems, runJsxHeadless } from "./extendscript-sandbox.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const figma = path.join(root, "plugins", "figma");
@@ -54,19 +55,15 @@ assert.match(indesignLegacy, /sourceCharacters\.length !== outputCharacters\.len
 assert.match(indesignLegacy, /allPageItems/);
 assert.match(indesignLegacy, /function hasScramblableContents/);
 // The classic JSX runs in ExtendScript, an ES3 engine: reserved words cannot be property names
-// (`{ for: 1 }` stops the whole script from loading) and Object.prototype carries watch, unwatch,
-// toSource and reflect. Parse it as ES3 and run its engine with those members present.
+// (`{ for: 1 }` stops the whole script from loading), ES5 builtins such as Array.prototype.forEach
+// and JSON are missing, and Object.prototype carries watch, unwatch, toSource and reflect. Parse it
+// as ES3 and run its engine in a sandbox that behaves the same way (scripts/extendscript-sandbox.mjs).
 const legacySource = indesignLegacy.replace(/^#target .*$/m, "");
 parse(legacySource, { ecmaVersion: 3, allowReserved: "never" });
 const engineMatch = legacySource.match(/\/\/ @engine:start\n([\s\S]*?)\/\/ @engine:end/);
 assert.ok(engineMatch, "Text Scramble.jsx must keep its @engine:start and @engine:end markers.");
 assert.match(legacySource, /\/\/ @engine:end\n[\s\S]*\/\/ @document:start\n[\s\S]*?\/\/ @document:end/, "Text Scramble.jsx must keep its document-walking code between @document:start and @document:end, after the engine.");
-const sandbox = vm.createContext({});
-vm.runInContext(
-  "Object.prototype.watch = function () {}; Object.prototype.unwatch = function () {};" +
-    "Object.prototype.toSource = function () { return ''; }; Object.prototype.reflect = {};",
-  sandbox,
-);
+const sandbox = createExtendScriptContext();
 const legacy = vm.runInContext(
   `(function () {\n${engineMatch[1]}\nreturn { scrambleContents: scrambleContents, COMMON_WORDS: COMMON_WORDS, UNWELCOME_FRAGMENTS: UNWELCOME_FRAGMENTS };\n})()`,
   sandbox,
@@ -93,6 +90,42 @@ for (let run = 0; run < 40; run++) {
   }
 }
 
+// The document code outside the engine must not call ES5 methods either, even on arrays that come
+// from InDesign (which the sandbox cannot strip), and must stay ASCII so any encoding reads it.
+assert.deepEqual(es3Problems(indesignLegacy, { skipSections: ["engine"], strictIndexOf: true }), [], "Text Scramble.jsx uses ES5 outside its engine.");
+assert.doesNotMatch(legacySource.slice(legacySource.indexOf("// @engine:end")), /[^\x00-\x7F]/, "Text Scramble.jsx must stay ASCII outside its engine.");
+
+// Smoke-run the built JSX headlessly against a small fake document: the text changes, in one undo
+// step, and the report has the panel's shape.
+const bundledFakes = await build({
+  entryPoints: [path.join(root, "tests", "fakes", "indesign.ts")],
+  bundle: true,
+  write: false,
+  format: "esm",
+  platform: "neutral",
+});
+const fakes = await import(`data:text/javascript;base64,${Buffer.from(bundledFakes.outputFiles[0].text).toString("base64")}`);
+const smoke = fakes.createInDesign();
+const smokePage = smoke.document.spread(["1"]).pages[0];
+const smokeSource = "Brindlewick met Quellmoor in 2026.";
+const smokeStory = smoke.document.story(smokeSource);
+smoke.document.frame(smokePage, smokeStory);
+smoke.document.frame(smokePage, smoke.document.story([smoke.document.table([["Quarter"], ["Totals 7"]])]));
+smoke.app.activeWindow.activePage = smokePage;
+const smokeReport = runJsxHeadless(indesignLegacy, { ...fakes.hostFor(smoke.app), settings: { scope: "page", seed: "verify" } });
+const letterShape = (text) => text.replace(/[A-Za-z]/g, "L").replace(/[0-9]/g, "N");
+assert.notEqual(smokeStory.contents, smokeSource, "The built JSX did not change any text.");
+assert.equal(letterShape(smokeStory.contents), letterShape(smokeSource));
+assert.deepEqual(smoke.app.doScriptCalls, [{ language: "JAVASCRIPT", undoMode: "ENTIRE_SCRIPT", name: "Text Scramble" }]);
+assert.deepEqual(Object.keys(smokeReport).sort(), [
+  "changed", "characters", "cleanup", "empty", "errors", "keptParagraphs", "kinds", "names", "notes", "overflow", "parentPages", "scope", "skipped",
+]);
+assert.deepEqual(Object.keys(smokeReport.kinds).sort(), ["cell", "footnote", "frame", "overset", "path", "selection", "story"]);
+assert.deepEqual(Object.keys(smokeReport.skipped).sort(), ["hidden", "locked", "unreadable"]);
+assert.deepEqual(Object.keys(smokeReport.overflow).sort(), ["alreadyOverflowing", "overflowing"]);
+assert.deepEqual([smokeReport.scope, smokeReport.changed, smokeReport.kinds.frame, smokeReport.kinds.cell, smokeReport.empty], ["page", 3, 1, 2, null]);
+assert.deepEqual(smokeReport.errors, []);
+
 // The PNG icons are committed renders of icon.svg (see scripts/render-icons.mjs). Fail when the SVG
 // changed without a re-render, or when a PNG is not the size the manifest promises.
 const iconSvgHash = createHash("sha256").update(await readFile(path.join(root, "assets", "icon.svg"))).digest("hex");
@@ -109,4 +142,4 @@ assert.match(indesignUi, /Formatting stays put/);
 assert.ok((await stat(path.join(figma, "dist", "code.js"))).size < 100_000);
 assert.ok((await stat(path.join(indesign, "dist", "index.js"))).size < 100_000);
 
-console.log("Build verified: manifests, privacy boundary, formatting paths, ExtendScript compatibility, UI, and bundle sizes.");
+console.log("Build verified: manifests, privacy boundary, formatting paths, ExtendScript compatibility, a headless JSX run, UI, and bundle sizes.");
