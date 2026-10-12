@@ -49,7 +49,7 @@ Two pages and a parent page. It holds:
 - **What it checks**, in seven fresh documents:
   1. **Document scope, defaults (seed 1):** every part changes and no "Brindlewick" is left, except the hidden frame (skipped and counted). The locked layer and the locked frame are locked again afterwards. Links and document info are unchanged. Text length is unchanged, the headline keeps its style, and its one underlined character stays underlined. There are no errors. The overflow report names page 2. The emoji line is either scrambled or reported as "couldn't be lined up". One Undo restores the story, the parent page, the bookmark and the variable.
   2. **Page scope (page 2):** the page 1 frame is untouched. The page 2 frame and the overset text change, and so do the locked-layer slug and the grouped caption. The parent page and the circle on page 1 are untouched.
-  3. **Selection (page 1 article frame):** only that frame changes, not the next frame in the thread or any other frame.
+  3. **Selection (page 1 article frame):** only that frame's text changes. The text after it in the story (the next frame and the overset text) is unchanged character for character, even if some of it reflows back into the first frame. No other frame changes.
   4. **Include hidden on, include locked off:** the hidden frame changes. Both locked texts stay, and the report counts 2 locked.
   5. **Keep TS Headline readable, always scramble "Brindlewick":** the headline reads "<invented word> Annual Review", the body is scrambled, and the report counts 1 kept paragraph.
   6. **Cleanup:** the web link becomes `https://example.com/link-1`, the email link becomes `mailto:hello@example.com`, and the author and title are empty.
@@ -160,7 +160,7 @@ Setup: build a scratch document with `indesign-fixture.bom.jsx`. Ask the person 
 ### P14. Menu command
 
 - **Do:** in **Edit › Keyboard Shortcuts**, give the plugin's **Scramble Selection** command a shortcut. Press it with nothing selected, then with the page 1 article frame selected.
-- **Expect:** with nothing selected, a dialog says **Select text, frames or table cells first.** With the frame selected, the frame is scrambled using the panel's options, and ⌘Z once restores it.
+- **Expect:** with nothing selected, a dialog says **Select text, frames or table cells first.** With the frame selected, the frame is scrambled using the panel's options, and ⌘Z once restores it. Compare by position in the story, not by what each frame shows: the text after the frame's original end is unchanged, though some of it may reflow back into the frame.
 
 ### P15. Two documents
 

@@ -194,8 +194,12 @@
       var before = snapshot(f);
       runScript({ scope: "selection", seed: 3 });
       var after = snapshot(f);
-      check("3 selection", "selected frame changed", after.frame1 !== before.frame1, after.frame1);
-      check("3 selection", "next frame untouched", after.frame2 === before.frame2);
+      // Scrambled words can be narrower, so text from the next frame may reflow back into frame 1.
+      // Compare the story by position instead: the first frame's original range changes, and
+      // everything after it (the next frame and the overset text) stays byte for byte.
+      var frameLength = before.frame1.length;
+      check("3 selection", "selected frame changed", after.story.substr(0, frameLength) !== before.story.substr(0, frameLength), after.story.substr(0, frameLength));
+      check("3 selection", "text after the selected frame untouched", after.story.substr(frameLength) === before.story.substr(frameLength), after.story.substr(frameLength, 80));
       check("3 selection", "other frames untouched", after.pasteboard === before.pasteboard && after.footer === before.footer);
     });
 
