@@ -27,3 +27,29 @@ jobs:
 
       - name: Verify and package plugins
         run: npm run package
+
+  verify-and-package-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify and package plugins
+        run: npm run package
+
+      - name: Check the committed builds match the source
+        run: |
+          if [ -n "$(git status --porcelain -- plugins/figma/dist plugins/indesign/dist)" ]; then
+            git status --short -- plugins/figma/dist plugins/indesign/dist
+            echo "::error::The committed plugins/*/dist files are out of date. Run npm run build and commit them."
+            exit 1
+          fi

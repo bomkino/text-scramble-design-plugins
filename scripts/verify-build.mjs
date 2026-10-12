@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { access, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -89,6 +90,17 @@ for (let run = 0; run < 40; run++) {
     assert.ok(!common.has(word), `Legacy JSX produced the real word "${word}".`);
     assert.ok(lists.UNWELCOME_FRAGMENTS.every((fragment) => !word.includes(fragment)), `Legacy JSX produced "${word}".`);
   }
+}
+
+// The PNG icons are committed renders of icon.svg (see scripts/render-icons.mjs). Fail when the SVG
+// changed without a re-render, or when a PNG is not the size the manifest promises.
+const iconSvgHash = createHash("sha256").update(await readFile(path.join(root, "assets", "icon.svg"))).digest("hex");
+const renderedFrom = (await readFile(path.join(root, "assets", "icon.svg.sha256"), "utf8")).split(/\s+/)[0];
+assert.equal(iconSvgHash, renderedFrom, "assets/icon.svg changed but its PNG icons were not re-rendered. Run `npm run icons` on a Mac.");
+for (const [name, size] of [["icon.png", 24], ["icon@2x.png", 48]]) {
+  const png = await readFile(path.join(indesign, "dist", "icons", name));
+  assert.equal(png.subarray(1, 4).toString("latin1"), "PNG", `${name} is not a PNG.`);
+  assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [size, size], `${name} must be ${size}×${size}.`);
 }
 
 assert.match(figmaUi, /Formatting stays put/);

@@ -29,7 +29,7 @@ Text Scramble changes the current selection or page. Duplicate the Figma page or
 
 ## Develop
 
-Requires Node.js 20 or newer. Release packaging currently uses macOS `sips` and `ditto`; the plugin runtime remains compatible with Figma and InDesign on macOS and Windows.
+Requires Node.js 20 or newer. Building and packaging work on macOS and Linux. The InDesign PNG icons are committed; after editing `assets/icon.svg`, re-render them on a Mac with `npm run icons`. The plugins themselves run in Figma and InDesign on macOS and Windows.
 
 ```bash
 npm install

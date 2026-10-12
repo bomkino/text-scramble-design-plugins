@@ -1,4 +1,3 @@
-import { spawnSync } from "node:child_process";
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,17 +11,6 @@ const projectPackage = JSON.parse(await readFile(path.join(root, "package.json")
 async function clean(directory) {
   await rm(directory, { recursive: true, force: true });
   await mkdir(directory, { recursive: true });
-}
-
-async function renderIcon(output, size) {
-  const source = path.join(root, "assets", "icon.svg");
-  const rendered = path.join(path.dirname(output), "icon-source.png");
-  await mkdir(path.dirname(output), { recursive: true });
-  const convert = spawnSync("sips", ["-s", "format", "png", source, "--out", rendered], { encoding: "utf8" });
-  if (convert.status !== 0) throw new Error(convert.stderr || "Could not render plugin icon.");
-  const resize = spawnSync("sips", ["-z", String(size), String(size), rendered, "--out", output], { encoding: "utf8" });
-  if (resize.status !== 0) throw new Error(resize.stderr || "Could not resize plugin icon.");
-  await rm(rendered, { force: true });
 }
 
 // The classic JSX runs in ExtendScript (ES3), so it cannot import the core. Inject the shared word
@@ -92,8 +80,10 @@ await writeFile(path.join(indesign, "dist", "Text Scramble.jsx"), await buildLeg
 await cp(path.join(indesign, "src", "index.html"), path.join(indesign, "dist", "index.html"));
 await mkdir(path.join(indesign, "dist", "icons"), { recursive: true });
 await cp(path.join(root, "assets", "icon.svg"), path.join(indesign, "dist", "icons", "icon.svg"));
-await renderIcon(path.join(indesign, "dist", "icons", "icon.png"), 24);
-await renderIcon(path.join(indesign, "dist", "icons", "icon@2x.png"), 48);
+// The PNG icons are rendered once from icon.svg on a Mac (`npm run icons`) and committed, so the
+// build runs the same on any OS. verify-build.mjs fails if icon.svg changes without a re-render.
+await cp(path.join(root, "assets", "icon.png"), path.join(indesign, "dist", "icons", "icon.png"));
+await cp(path.join(root, "assets", "icon@2x.png"), path.join(indesign, "dist", "icons", "icon@2x.png"));
 
 const figmaManifest = JSON.parse(await readFile(path.join(figma, "manifest.json"), "utf8"));
 const indesignManifest = JSON.parse(await readFile(path.join(indesign, "manifest.json"), "utf8"));
