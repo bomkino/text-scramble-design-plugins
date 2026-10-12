@@ -132,6 +132,11 @@
     return /[A-Za-z]/.test(source) || (scrambleNumbers && /[0-9]/.test(source));
   }
 
+  // @engine:end
+
+  // Document walking and in-place replacement. Kept apart from the engine so the algorithm can change
+  // without touching how the script finds and edits InDesign text.
+  // @document:start
   function toCharacters(value) {
     var result = [];
     var index = 0;
@@ -225,7 +230,7 @@
     }
   }
 
-  // @engine:end
+  // @document:end
 
   if (!app.documents.length) {
     alert("Open an InDesign document first.", "Text Scramble");

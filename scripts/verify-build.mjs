@@ -60,6 +60,7 @@ const legacySource = indesignLegacy.replace(/^#target .*$/m, "");
 parse(legacySource, { ecmaVersion: 3, allowReserved: "never" });
 const engineMatch = legacySource.match(/\/\/ @engine:start\n([\s\S]*?)\/\/ @engine:end/);
 assert.ok(engineMatch, "Text Scramble.jsx must keep its @engine:start and @engine:end markers.");
+assert.match(legacySource, /\/\/ @engine:end\n[\s\S]*\/\/ @document:start\n[\s\S]*?\/\/ @document:end/, "Text Scramble.jsx must keep its document-walking code between @document:start and @document:end, after the engine.");
 const sandbox = vm.createContext({});
 vm.runInContext(
   "Object.prototype.watch = function () {}; Object.prototype.unwatch = function () {};" +
