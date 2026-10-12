@@ -62,7 +62,26 @@ test("lengthens the name when the safe ending is shorter", () => {
   assert.match(scrambleText("quellmoor.studio", { seed: 3 }), /^[a-z]{9}an\.test$/);
   assert.match(scrambleText("quellmoor.photography", { seed: 3 }), /^[a-z]{9}an\.localhost$/);
   assert.match(scrambleText("QUELLMOOR.STUDIO", { seed: 3 }), /^[A-Z]{9}AN\.TEST$/);
-  assert.match(scrambleText("Quellmoor.Studio", { seed: 3 }), /^[A-Z][a-z]{8}an\.Test$/);
+  assert.match(scrambleText("hello@Quellmoor.Studio", { seed: 3 }), /^[a-z]{5}@[A-Z][a-z]{8}an\.Test$/);
+});
+
+test("reads a missing space after a full stop as two words, not an address", () => {
+  const sources = ["the end.Next week", "the file.App runs", "End of story.Next", "Read the brief.Design follows."];
+
+  for (let seed = 1; seed <= 40; seed++) {
+    for (const source of sources) {
+      // Words scramble the same wherever they stand, so the text must read as if the full stop were a space.
+      const dot = source.lastIndexOf(".", source.length - 2);
+      const spaced = Array.from(scrambleText(`${source.slice(0, dot)} ${source.slice(dot + 1)}`, { seed }));
+      spaced[dot] = ".";
+
+      assert.equal(scrambleText(source, { seed }), spaced.join(""), `"${source}" was read as an address.`);
+    }
+  }
+  // Written in lower case or all capitals, or after "@", "://" or "www.", it is still an address.
+  for (const source of ["see quellmoor.studio", "SEE QUELLMOOR.STUDIO", "https://Quellmoor.App", "www.Quellmoor.App"]) {
+    assert.match(scrambleText(source, { seed: 5 }), /\.(?:test|alt)$/i, `"${source}" was not read as an address.`);
+  }
 });
 
 test("keeps schemes, www and already safe domains as written", () => {

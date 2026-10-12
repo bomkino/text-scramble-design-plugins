@@ -192,5 +192,16 @@
     "outputs": [
       "mailto:novu@example.com · demo.example.org · shop.local · Suä@hulá.xx · o.o. 4.60 Vara.le"
     ]
+  },
+  {
+    "inputs": [
+      "The end.Next week, the file.App runs; see Quellmoor.Studio or hello@Quellmoor.Studio."
+    ],
+    "options": {
+      "seed": "spring"
+    },
+    "outputs": [
+      "Rad aha.Prus mowi, rad leri.Ned dere; vos Thalanuva.Lenefe ra ecari@Thalanuvaan.Test."
+    ]
   }
 ]
