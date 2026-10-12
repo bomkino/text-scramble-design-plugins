@@ -224,7 +224,8 @@ export function runScramble(host: InDesignHost, options: RunOptions): ScrambleRe
   const nameOutputs = names.map((name) => scramble(name.source, keepNames && name.kind !== "variable"));
 
   report.empty = emptyReason(app, options, writes.length + names.length, report.skipped);
-  if (report.empty === "nothing-to-scramble" && targets.length && report.keptParagraphs) report.empty = "all-kept";
+  // Text was found but kept on purpose: say so, even when hidden or locked items were skipped too.
+  if ((report.empty === "nothing-to-scramble" || report.empty === "all-skipped") && targets.length && report.keptParagraphs) report.empty = "all-kept";
   if (!document || (!writes.length && !names.length && !options.cleanup)) {
     report.notes = Array.from(new Set(report.notes));
     return report;
