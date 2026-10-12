@@ -220,13 +220,16 @@ export function runScramble(host: InDesignHost, options: RunOptions): ScrambleRe
   });
   // Bookmarks and anchors usually repeat headings, so they follow the "keep readable" rule: with kept
   // styles, only listed words change in them. Text variables always scramble in full.
+  // A name that comes out unchanged (kept readable, with no listed word in it) is left alone and not counted.
   const keepNames = (options.keepStyles ?? []).length > 0;
-  const nameOutputs = names.map((name) => scramble(name.source, keepNames && name.kind !== "variable"));
+  const nameWrites = names
+    .map((name) => ({ name, output: scramble(name.source, keepNames && name.kind !== "variable") }))
+    .filter(({ name, output }) => output !== name.source);
 
-  report.empty = emptyReason(app, options, writes.length + names.length, report.skipped);
+  report.empty = emptyReason(app, options, writes.length + nameWrites.length, report.skipped);
   // Text was found but kept on purpose: say so, even when hidden or locked items were skipped too.
   if ((report.empty === "nothing-to-scramble" || report.empty === "all-skipped") && targets.length && report.keptParagraphs) report.empty = "all-kept";
-  if (!document || (!writes.length && !names.length && !options.cleanup)) {
+  if (!document || (!writes.length && !nameWrites.length && !options.cleanup)) {
     report.notes = Array.from(new Set(report.notes));
     return report;
   }
@@ -248,9 +251,9 @@ export function runScramble(host: InDesignHost, options: RunOptions): ScrambleRe
           report.errors.push(message(error));
         }
       }
-      names.forEach((name, index) => {
+      nameWrites.forEach(({ name, output }) => {
         try {
-          name.apply(nameOutputs[index]);
+          name.apply(output);
           report.names++;
         } catch (error) {
           report.errors.push(message(error));

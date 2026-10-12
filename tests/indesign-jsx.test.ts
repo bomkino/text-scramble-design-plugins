@@ -541,7 +541,7 @@ for (const engine of ENGINES) {
     assert.equal(d.child.name, "Regional detail");
     assert.match(d.anchor.name, /^\p{L}+ results anchor$/u);
     assert.doesNotMatch(d.client.variableOptions.contents, /Traders/);
-    assert.equal(report.names, 4);
+    assert.equal(report.names, 3, "the unchanged child bookmark is not counted");
 
     const { app, document } = createInDesign();
     const page = document.spread(["1"]).pages[0];

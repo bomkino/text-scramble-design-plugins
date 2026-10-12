@@ -1035,8 +1035,20 @@
     }
 
     function cellLabel(cell) {
-      var frame = readPath(cell, ["parent", "storyOffset", "parentTextFrames", 0], null);
-      return frame ? "table on " + placeLabel(frame) : "table";
+      var table = readProperty(cell, "parent", null);
+      var offset;
+      var frame;
+      var outerCell;
+      var depth;
+      // A nested table sits in a cell of an outer table, so climb out until a table sits in a frame.
+      for (depth = 0; table && depth < 8; depth += 1) {
+        offset = readProperty(table, "storyOffset", null);
+        frame = readPath(offset, ["parentTextFrames", 0], null);
+        if (frame) return "table on " + placeLabel(frame);
+        outerCell = readProperty(offset, "parent", null);
+        table = constructorName(outerCell) === "Cell" ? readProperty(outerCell, "parent", null) : null;
+      }
+      return "table";
     }
 
     function overflowReport(containers, containersBefore, cells, cellsBefore) {
@@ -1234,7 +1246,7 @@
       var listed;
       var keepNames;
       var writes = [];
-      var nameOutputs = [];
+      var nameWrites = [];
       var plan;
       var output;
       var containersBefore;
@@ -1266,9 +1278,9 @@
               report.errors.push(errorMessage(error));
             }
           }
-          for (applyIndex = 0; applyIndex < names.length; applyIndex += 1) {
+          for (applyIndex = 0; applyIndex < nameWrites.length; applyIndex += 1) {
             try {
-              names[applyIndex].owner[names[applyIndex].field] = nameOutputs[applyIndex];
+              nameWrites[applyIndex].name.owner[nameWrites[applyIndex].name.field] = nameWrites[applyIndex].output;
               report.names += 1;
             } catch (error) {
               report.errors.push(errorMessage(error));
@@ -1322,15 +1334,17 @@
       }
       // Bookmarks and anchors usually repeat headings, so they follow the "keep readable" rule: with
       // kept styles, only listed words change in them. Text variables always scramble in full.
+      // A name that comes out unchanged (kept readable, with no listed word in it) is left alone and not counted.
       keepNames = options.keepStyles.length > 0;
       for (index = 0; index < names.length; index += 1) {
-        nameOutputs.push(scramble(names[index].source, keepNames && names[index].kind !== "variable"));
+        output = scramble(names[index].source, keepNames && names[index].kind !== "variable");
+        if (output !== names[index].source) nameWrites.push({ name: names[index], output: output });
       }
 
-      report.empty = emptyReason(app, options, writes.length + names.length, report.skipped);
+      report.empty = emptyReason(app, options, writes.length + nameWrites.length, report.skipped);
       // Text was found but kept on purpose: say so, even when hidden or locked items were skipped too.
       if ((report.empty === "nothing-to-scramble" || report.empty === "all-skipped") && targets.length && report.keptParagraphs) report.empty = "all-kept";
-      if (!document || (!writes.length && !names.length && !options.cleanup)) {
+      if (!document || (!writes.length && !nameWrites.length && !options.cleanup)) {
         report.notes = uniqueStrings(report.notes);
         return report;
       }
@@ -1532,7 +1546,7 @@
         lines.push(count(report.errors.length, "problem", "problems") + " stopped some text from changing: " + report.errors[0] + (report.errors.length > 1 ? " (and more)" : ""));
       }
       for (index = 0; index < report.notes.length; index += 1) lines.push(report.notes[index]);
-      lines.push("Edit > Undo puts it all back in one step.");
+      lines.push("Edit > Undo Text Scramble puts it all back in one step.");
       return lines.join("\n\n");
     }
 

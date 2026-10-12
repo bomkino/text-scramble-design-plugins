@@ -46,8 +46,16 @@ export function placeLabel(item: any): string {
 }
 
 function cellLabel(cell: any): string {
-  const frame = read(() => cell.parent.storyOffset.parentTextFrames[0], null);
-  return frame ? `table on ${placeLabel(frame)}` : "table";
+  let table = read(() => cell.parent, null);
+  // A nested table sits in a cell of an outer table, so climb out until a table sits in a frame.
+  for (let depth = 0; table && depth < 8; depth++) {
+    const offset = read(() => table.storyOffset, null);
+    const frame = read(() => offset.parentTextFrames[0], null);
+    if (frame) return `table on ${placeLabel(frame)}`;
+    const outerCell = read(() => offset.parent, null);
+    table = constructorName(outerCell) === "Cell" ? read(() => outerCell.parent, null) : null;
+  }
+  return "table";
 }
 
 export function overflowReport(

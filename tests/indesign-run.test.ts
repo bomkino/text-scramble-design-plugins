@@ -348,6 +348,19 @@ test("keep readable: everything kept is reported as such", () => {
   assert.equal(app.doScriptCalls.length, 0);
 });
 
+test("keep readable: a bookmark that stays the same is not counted as changed", () => {
+  const { app, document } = createInDesign();
+  const page = document.spread(["1"]).pages[0];
+  const headline = document.paragraphStyle("Headline");
+  document.frame(page, document.story([headline, "Brindlewick Annual Review"]));
+  const bookmark = document.bookmark("Brindlewick Annual Review");
+  const report = run(app, { scope: "document", keepStyles: ["Headline"] });
+  assert.equal(bookmark.name, "Brindlewick Annual Review");
+  assert.equal(report.names, 0);
+  assert.equal(report.empty, "all-kept");
+  assert.equal(app.doScriptCalls.length, 0);
+});
+
 test("keepPlan lines up by search when indices disagree, and refuses to guess otherwise", () => {
   const { document } = createInDesign();
   const keep = document.paragraphStyle("Keep");
@@ -382,11 +395,15 @@ test("overflow report: names the pages of frames and cells that now overflow", (
   const table = document.table([tight]);
   table.rows[0].capacity = exact;
   document.frame(spread.pages[0], document.story(["Table: ", table]));
+  // A nested table's cell is named after the page its outer table sits on.
+  const nested = document.table([tight]);
+  nested.rows[0].capacity = exact;
+  document.frame(spread.pages[1], document.story(["Outer: ", document.table([["Inner: ", nested]])]));
 
   const report = run(app, { scope: "document", seed: 12 });
 
   const labels = report.overflow.overflowing.map((item) => item.label).sort();
-  assert.deepEqual(labels, ["page 2", "parent page B-Parent", "table on page 1"]);
+  assert.deepEqual(labels, ["page 2", "parent page B-Parent", "table on page 1", "table on page 2"]);
   assert.equal(report.overflow.alreadyOverflowing, 1);
   assert.equal(document.world.recomposed > 0, true);
 });

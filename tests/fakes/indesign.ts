@@ -456,6 +456,10 @@ export class TextPath {
 export class InsertionPoint {
   readonly isValid = true;
   constructor(readonly flow: Flow, readonly index: number) {}
+  /** Like InDesign: the story, cell or footnote the insertion point sits in. */
+  get parent(): unknown {
+    return this.flow.owner;
+  }
   get parentTextFrames(): Array<PageItem | TextPath> {
     return this.flow.owner instanceof Story ? this.flow.owner.framesHolding(this.index) : [];
   }
