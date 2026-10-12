@@ -15,7 +15,7 @@ Text Scramble changes the letters and numbers people can read. It doesn't change
 
 - Every word becomes an invented, pronounceable word of the same length. A word that repeats becomes the same invented word every time it appears in one run, and in every run with the same **Seed**.
 - Words in other alphabets, such as Greek or Cyrillic, become invented words in Latin letters of the same length.
-- Email addresses and web addresses typed as text are scrambled, and their ending (such as `.com`) becomes one that can never be registered, such as `.test`, `.example` or `.alt`, at the same length. `https://`, `mailto:` and `www.` stay as they are.
+- Email addresses and web addresses typed as text are scrambled, and their ending (such as `.com`) becomes one that can never be registered, such as `.test`, `.example` or `.alt`, at the same length. `https://`, `mailto:` and `www.` stay as they are. A name written with capitals and no `@`, `://` or `www.`, such as `Quellmoor.Studio`, counts as two ordinary words.
 
 ## Kept by Figma and InDesign
 
