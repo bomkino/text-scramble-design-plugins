@@ -191,7 +191,7 @@ test("parses as ES3, stays ASCII and declares each name once", async () => {
       names.add(name);
     }
   }
-  for (const name of ["createScrambler", "createSeededRandom", "createWordMatcher", "hasScramblableText", "scrambleText", "scrambleTexts", "scrambleContents", "hasScramblableContents"]) {
+  for (const name of ["createScrambler", "createSeededRandom", "createWordMatcher", "hasScramblableText", "scrambleText", "scrambleTexts"]) {
     assert.ok(names.has(name), `The ES3 engine must define ${name}.`);
   }
 });
@@ -374,22 +374,9 @@ test("detects scramblable text exactly like the core", async () => {
     for (const scrambleNumbers of [undefined, true, false]) {
       const expected = hasScramblableText(text, { scrambleNumbers });
       assert.equal(es3.hasScramblableText(text, { scrambleNumbers }), expected, `Differs for ${JSON.stringify(text)}.`);
-      if (scrambleNumbers !== undefined) assert.equal(es3.hasScramblableContents(text, scrambleNumbers), expected);
+      if (scrambleNumbers !== undefined) assert.equal(es3.hasScramblableText(text, scrambleNumbers), expected, "a bare true or false works too");
     }
     assert.equal(es3.hasScramblableText(text), hasScramblableText(text));
-  }
-});
-
-test("keeps scrambleContents working for the classic script's main code", async () => {
-  const es3 = await loadEngine();
-  const texts = ["Sloane met Ruby in Lisbon.", "RUBY and SLOANE, 2026 · hello@quellmoor.co", "watch reflect toSource unwatch"];
-  for (const scrambleNumbers of [true, false]) {
-    await withMathRandom(`contents ${scrambleNumbers}`, () => {
-      const core = createScrambler({ scrambleNumbers });
-      const cache = vm.runInContext("({})", es3);
-      for (const text of texts) assert.equal(es3.scrambleContents(text, scrambleNumbers, cache), core.scramble(text));
-      assert.ok(Object.prototype.hasOwnProperty.call(cache, "~scrambler"));
-    });
   }
 });
 

@@ -53,7 +53,7 @@ assert.match(indesignCode, /UXPSCRIPT/);
 assert.match(indesignLegacy, /function toCharacters/);
 assert.match(indesignLegacy, /sourceCharacters\.length !== outputCharacters\.length/);
 assert.match(indesignLegacy, /allPageItems/);
-assert.match(indesignLegacy, /function hasScramblableContents/);
+assert.match(indesignLegacy, /function hasScramblableText/);
 // The classic JSX runs in ExtendScript, an ES3 engine: reserved words cannot be property names
 // (`{ for: 1 }` stops the whole script from loading), ES5 builtins such as Array.prototype.forEach
 // and JSON are missing, and Object.prototype carries watch, unwatch, toSource and reflect. Parse it
@@ -88,7 +88,7 @@ for (const statement of scriptBody) {
 
 const sandbox = createExtendScriptContext();
 const legacy = vm.runInContext(
-  `(function () {\n${engineMatch[1]}\nreturn { createScrambler: createScrambler, createSeededRandom: createSeededRandom, createWordMatcher: createWordMatcher, hasScramblableText: hasScramblableText, scrambleContents: scrambleContents, hasScramblableContents: hasScramblableContents, COMMON_WORDS: COMMON_WORDS, UNWELCOME_FRAGMENTS: UNWELCOME_FRAGMENTS, TOP_LEVEL_DOMAINS: TOP_LEVEL_DOMAINS };\n})()`,
+  `(function () {\n${engineMatch[1]}\nreturn { createScrambler: createScrambler, createSeededRandom: createSeededRandom, createWordMatcher: createWordMatcher, hasScramblableText: hasScramblableText, COMMON_WORDS: COMMON_WORDS, UNWELCOME_FRAGMENTS: UNWELCOME_FRAGMENTS, TOP_LEVEL_DOMAINS: TOP_LEVEL_DOMAINS };\n})()`,
   sandbox,
 );
 async function importBundled(entry) {
@@ -138,17 +138,9 @@ for (let trial = 0; trial < 150; trial++) {
   for (let text = 0; text < 3; text++) {
     const input = randomText();
     assert.equal(legacyScrambler.scramble(input, legacyFilter), coreScrambler.scramble(input, coreFilter), `The JSX engine differs from the core on ${JSON.stringify(input)}.`);
-    assert.equal(legacy.hasScramblableContents(input, trial % 2 === 0), core.hasScramblableText(input, { scrambleNumbers: trial % 2 === 0 }));
+    assert.equal(legacy.hasScramblableText(input, { scrambleNumbers: trial % 2 === 0 }), core.hasScramblableText(input, { scrambleNumbers: trial % 2 === 0 }));
   }
 }
-// The main code keeps calling scrambleContents with one cache object per run.
-const contentsProbe = "Watch the reflect toSource unwatch constructor valueOf: Sloane, Ruby and the ten roses, 2026.";
-const contentsCache = vm.runInContext("({})", sandbox);
-const contentsOutput = legacy.scrambleContents(contentsProbe, true, contentsCache);
-assert.equal(Array.from(contentsOutput).length, Array.from(contentsProbe).length);
-assert.notEqual(contentsOutput, contentsProbe);
-assert.equal(legacy.scrambleContents("Sloane", true, contentsCache), contentsOutput.split(": ")[1].split(",")[0]);
-assert.equal(legacy.scrambleContents("2026", false, vm.runInContext("({})", sandbox)), "2026");
 
 // The document code outside the engine must not call ES5 methods either, even on arrays that come
 // from InDesign (which the sandbox cannot strip), and must stay ASCII so any encoding reads it.

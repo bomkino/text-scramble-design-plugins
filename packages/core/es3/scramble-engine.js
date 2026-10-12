@@ -843,15 +843,3 @@ function scrambleTexts(inputs, options) {
   for (index = 0; index < inputs.length; index += 1) outputs.push(scrambler.scramble(inputs[index]));
   return outputs;
 }
-
-// The names the classic InDesign script's main code calls. One scrambler per run lives on the run's cache
-// object, so a word becomes the same invented word in every frame.
-function scrambleContents(source, scrambleNumbers, cache) {
-  if (!cache) return createScrambler({ scrambleNumbers: scrambleNumbers }).scramble(source);
-  if (!hasEntry(cache, "scrambler")) setEntry(cache, "scrambler", createScrambler({ scrambleNumbers: scrambleNumbers }));
-  return getEntry(cache, "scrambler").scramble(source);
-}
-
-function hasScramblableContents(source, scrambleNumbers) {
-  return hasScramblableText(source, scrambleNumbers);
-}

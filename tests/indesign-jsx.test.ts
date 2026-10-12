@@ -4,7 +4,7 @@
 
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import test from "node:test";
+import test, { before } from "node:test";
 import vm from "node:vm";
 import {
   createExtendScriptContext,
@@ -14,6 +14,8 @@ import {
   runJsxHeadless,
 } from "../scripts/extendscript-sandbox.mjs";
 import { createScrambler, createWordMatcher, estimateVisualWidth, hasScramblableText } from "../packages/core/src/scramble-text";
+import { TOP_LEVEL_DOMAINS } from "../packages/core/src/top-level-domains";
+import { COMMON_WORDS, UNWELCOME_FRAGMENTS } from "../packages/core/src/word-lists";
 import { runScramble, type RunOptions, type ScrambleReport } from "../plugins/indesign/src/run";
 import {
   Bookmark,
@@ -31,57 +33,34 @@ import {
 const SOURCE = readFileSync(new URL("../plugins/indesign/src/Text Scramble.jsx", import.meta.url), "utf8");
 const SECTIONS = extractSections(SOURCE, ["engine", "document", "ui"]);
 
-// An older-API engine with predictable output: every letter moves one place on (z wraps to a),
-// every digit goes up by one. It records the word caches it is handed, to prove one cache per run.
-const LEGACY_STUB = `
-  function shiftCharacter(character) {
-    if (character === "z") return "a";
-    if (character === "Z") return "A";
-    if (character === "9") return "0";
-    return String.fromCharCode(character.charCodeAt(0) + 1);
-  }
-  function scrambleContents(source, scrambleNumbers, cache) {
-    var caches = $.global.legacyCaches || ($.global.legacyCaches = []);
-    var known = false;
-    var index;
-    for (index = 0; index < caches.length; index += 1) if (caches[index] === cache) known = true;
-    if (!known) caches.push(cache);
-    return source.replace(/[A-Za-z]+|[0-9]+/g, function (token) {
-      if (/^[0-9]+$/.test(token) && !scrambleNumbers) return token;
-      var result = "";
-      for (index = 0; index < token.length; index += 1) result += shiftCharacter(token.charAt(index));
-      return result;
-    });
-  }
-  function hasScramblableContents(source, scrambleNumbers) {
-    return /[A-Za-z]/.test(source) || (scrambleNumbers && /[0-9]/.test(source));
-  }
-`;
-
 interface Engine {
   name: string;
   source: string;
   globals: Record<string, unknown>;
   /** Same seed, same words, and the same words as the UXP panel. */
   matchesCore: boolean;
-  /** Its invented words are predictable without a seed. */
-  predictable: boolean;
 }
 
 function withEngine(engine: string): string {
   return SOURCE.replace(SECTIONS.engine, () => engine);
 }
 
-const FILE_ENGINE: Engine = { name: "engine in the file", source: SOURCE, globals: {}, matchesCore: false, predictable: false };
+// The engine that ships: the ES3 port of the core that scripts/build.mjs puts in the @engine block.
+const FILE_ENGINE: Engine = { name: "engine in the file", source: "", globals: {}, matchesCore: true };
+// The TypeScript core itself, handed in from Node.
 const CORE_ENGINE: Engine = {
   name: "core engine API",
   source: withEngine("\n"),
   globals: { createScrambler, createWordMatcher, hasScramblableText },
   matchesCore: true,
-  predictable: false,
 };
-const LEGACY_ENGINE: Engine = { name: "older engine API", source: withEngine(LEGACY_STUB), globals: {}, matchesCore: false, predictable: true };
-const ENGINES = [FILE_ENGINE, CORE_ENGINE, LEGACY_ENGINE];
+const ENGINES = [FILE_ENGINE, CORE_ENGINE];
+
+before(async () => {
+  const { legacyEngineSource } = await import(new URL("../scripts/legacy-engine.mjs", import.meta.url).href);
+  const engine: string = await legacyEngineSource({ commonWords: COMMON_WORDS, unwelcomeFragments: UNWELCOME_FRAGMENTS, topLevelDomains: TOP_LEVEL_DOMAINS });
+  FILE_ENGINE.source = withEngine(`\n${engine}`);
+});
 
 type JsxReport = Omit<ScrambleReport, "overflow"> & {
   overflow: { overflowing: Array<{ label: string; kind: string }>; alreadyOverflowing: number };
@@ -99,12 +78,6 @@ function shape(text: string): string {
 
 function words(text: string): string[] {
   return text.match(/\p{L}+/gu) ?? [];
-}
-
-function shifted(text: string): string {
-  return text.replace(/[A-Za-z0-9]/g, (character) =>
-    character === "z" ? "a" : character === "Z" ? "A" : character === "9" ? "0" : String.fromCharCode(character.charCodeAt(0) + 1),
-  );
 }
 
 /** Every text flow in a document: stories, then the cells and footnotes inside them. */
@@ -418,7 +391,6 @@ for (const engine of ENGINES) {
     assert.equal(partial.kinds.selection, 1);
     assert.ok(story.contents.startsWith("Keep this. ") && story.contents.endsWith(" Keep that."));
     assert.notEqual(story.contents.slice(start, end), "Scramble these words.");
-    if (engine.predictable) assert.equal(story.contents.slice(start, end), shifted("Scramble these words."));
 
     const d = deck();
     const cellsBefore = d.table.rows.map((cell) => cell.contents);
@@ -531,7 +503,6 @@ for (const engine of ENGINES) {
     const headline = d.article.contents.split("\r")[0];
     assert.match(headline, /^\p{L}+ Annual Review$/u);
     assert.ok(!headline.startsWith("Brindlewick"));
-    if (engine.predictable) assert.equal(headline, "Csjoemfxjdl Annual Review");
     assert.equal(words(headline)[0], words(d.footerStory.contents)[0], "same invented word as elsewhere");
     assert.ok(!d.article.contents.includes("grew in every region"));
     assert.equal(report.keptParagraphs, 1);
@@ -654,7 +625,7 @@ for (const engine of ENGINES) {
   });
 }
 
-for (const engine of [CORE_ENGINE, LEGACY_ENGINE]) {
+for (const engine of ENGINES) {
   test(`overflow report: names the pages of frames and cells that now overflow (${engine.name})`, () => {
     const { app, document } = overflowDeck();
     const report = jsx(engine, app, { scope: "document", seed: 12 });
@@ -722,54 +693,40 @@ test("parity: the JSX and the UXP panel give the same report for the same docume
   }
 });
 
-test("parity: overflow with the core engine, word for word", () => {
-  const uxp = overflowDeck();
-  const classic = overflowDeck();
-  const expected = runScramble(hostFor(uxp.app), { scope: "document", seed: 12 });
-  const actual = jsx(CORE_ENGINE, classic.app, { scope: "document", seed: 12 });
-  assert.deepEqual(comparable(actual), comparable(expected));
-  assert.deepEqual(documentState(classic.document), documentState(uxp.document));
+test("parity: overflow, word for word", () => {
+  for (const engine of ENGINES) {
+    const uxp = overflowDeck();
+    const classic = overflowDeck();
+    const expected = runScramble(hostFor(uxp.app), { scope: "document", seed: 12 });
+    const actual = jsx(engine, classic.app, { scope: "document", seed: 12 });
+    assert.deepEqual(comparable(actual), comparable(expected), engine.name);
+    assert.deepEqual(documentState(classic.document), documentState(uxp.document), engine.name);
+  }
 });
 
-test("engine adapter: the older engine gets one shared cache per run and a whole-word matcher", () => {
-  const run = createInDesign();
-  const page = run.document.spread(["1"]).pages[0];
-  const keep = run.document.paragraphStyle("Keep");
-  const story = run.document.story([keep, "Hart met Brindlewick2 and BRINDLEWICK.\r", run.document.basicParagraph, "Hart again."]);
-  run.document.frame(page, story);
-  run.document.frame(page, run.document.story("Hart in a second frame."));
-  run.app.activeWindow.activePage = page;
-  const sandbox = createExtendScriptContext({ ...hostFor(run.app), alert: () => assert.fail("no alerts") });
-  vm.runInContext("$.global.TextScrambleTest = { scope: 'page', keepStyles: ['Keep'], alwaysScramble: ['brindlewick', 'HART'], seed: 3 };", sandbox);
-  vm.runInContext(LEGACY_ENGINE.source.replace(/^#target.*$/m, ""), sandbox);
-  assert.equal(vm.runInContext("$.global.legacyCaches.length", sandbox), 1, "one word cache for the whole run");
-  assert.equal(story.contents, "Ibsu met Brindlewick2 and CSJOEMFXJDL.\rIbsu bhbjo.");
-  const notes = vm.runInContext("$.global.TextScrambleResult.notes.join('|')", sandbox) as string;
-  assert.match(notes, /seed/, "a seed the engine cannot honour is mentioned");
-});
-
-test("engine adapter: the core engine API gives the UXP panel's words exactly", () => {
+test("engine: the shipped engine and the core API give the UXP panel's words exactly", () => {
   const withNames = () => {
     const d = deck();
     const story = d.document.story([d.headline, "Amélie Hart met AMELIE of Quellmoor\r", d.body, "Quellmoor, née Hart, wrote back."]);
     d.document.frame(d.page2, story);
     return { ...d, story };
   };
-  const uxp = withNames();
-  const classic = withNames();
-  const options = { scope: "document" as const, seed: "pitch", keepStyles: ["Headline"], alwaysScramble: ["Amélie", "brindlewick"] };
-  runScramble(hostFor(uxp.app), options);
-  const report = jsx(CORE_ENGINE, classic.app, options);
-  assert.deepEqual(documentState(classic.document), documentState(uxp.document));
-  const kept = classic.story.contents.split("\r")[0];
-  assert.match(kept, /^\p{L}+ Hart met \p{L}+ of Quellmoor$/u, "accents and case are ignored when matching listed words");
-  assert.ok(!kept.startsWith("Amélie") && !kept.includes("AMELIE"));
-  assert.ok(!report.notes.some((note) => note.includes("seed")));
+  for (const engine of ENGINES) {
+    const uxp = withNames();
+    const classic = withNames();
+    const options = { scope: "document" as const, seed: "pitch", keepStyles: ["Headline"], alwaysScramble: ["Amélie", "brindlewick"] };
+    runScramble(hostFor(uxp.app), options);
+    jsx(engine, classic.app, options);
+    assert.deepEqual(documentState(classic.document), documentState(uxp.document), engine.name);
+    const kept = classic.story.contents.split("\r")[0];
+    assert.match(kept, /^\p{L}+ Hart met \p{L}+ of Quellmoor$/u, "accents and case are ignored when matching listed words");
+    assert.ok(!kept.startsWith("Amélie") && !kept.includes("AMELIE"));
+  }
 });
 
 test("headless entry: $.global.TextScrambleTest runs without dialog or alerts and stores a plain report", () => {
   const d = deck();
-  const report = runJsxHeadless(SOURCE, {
+  const report = runJsxHeadless(FILE_ENGINE.source, {
     ...hostFor(d.app),
     settings: { scope: "document", seed: 1 },
     globals: {
@@ -789,7 +746,7 @@ test("headless entry: $.global.TextScrambleTest runs without dialog or alerts an
 
   const none = createInDesign();
   none.app.documentList.length = 0;
-  const empty = runJsxHeadless(SOURCE, { ...hostFor(none.app), settings: { scope: "page" } }) as JsxReport;
+  const empty = runJsxHeadless(FILE_ENGINE.source, { ...hostFor(none.app), settings: { scope: "page" } }) as JsxReport;
   assert.equal(empty.empty, "no-document");
   assert.equal(empty.cleanup, null);
 });
@@ -880,7 +837,7 @@ test("dialog: friendly messages for every empty run", () => {
 
 test("dialog: overflow, skipped items and failures are spelled out", () => {
   const fake = overflowDeck();
-  const { alerts } = interactive(LEGACY_ENGINE, fake.app, (dialog) => choose(dialog, { scope: 2 }));
+  const { alerts } = interactive(FILE_ENGINE, fake.app, (dialog) => choose(dialog, { scope: 2, seed: "12" }));
   assert.match(alerts[0], /now overflows here: (page 2|parent page B-Parent|table on page 1)(, (page 2|parent page B-Parent|table on page 1)){2}\./);
   assert.match(alerts[0], /1 frame or cell was already overflowing/);
 
@@ -888,7 +845,7 @@ test("dialog: overflow, skipped items and failures are spelled out", () => {
   d.footerStory.flow.assertEditable = () => {
     throw new Error("Story is checked out to InCopy.");
   };
-  const failed = interactive(LEGACY_ENGINE, d.app, (dialog) => choose(dialog, { scope: 2, check: { "Include locked items": false } })).alerts[0];
+  const failed = interactive(FILE_ENGINE, d.app, (dialog) => choose(dialog, { scope: 2, check: { "Include locked items": false } })).alerts[0];
   assert.match(failed, /Left 2 locked items alone/);
   assert.match(failed, /Left 1 hidden item alone/);
   assert.match(failed, /1 problem stopped some text from changing: Story is checked out to InCopy\./);

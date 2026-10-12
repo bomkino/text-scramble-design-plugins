@@ -236,51 +236,20 @@
       }
     }
 
-    // Engine adapter. The newer engine exposes createScrambler, createWordMatcher and
-    // hasScramblableText, like the TypeScript core. The older one only has scrambleContents and
-    // hasScramblableContents, so this falls back to them with one shared word cache per run.
-
-    function fallbackWordMatcher(entries) {
-      var wanted = makeSet([]);
-      var index;
-      var tokenIndex;
-      var tokens;
-      for (index = 0; index < entries.length; index += 1) {
-        tokens = String(entries[index]).match(/[A-Za-z0-9]+/g) || [];
-        for (tokenIndex = 0; tokenIndex < tokens.length; tokenIndex += 1) setAdd(wanted, tokens[tokenIndex].toLowerCase());
-      }
-      return function (token) {
-        return setHas(wanted, String(token).toLowerCase());
-      };
-    }
-
+    // The engine block is the ES3 port of the TypeScript core (packages/core/es3), with the same API.
     function createEngine(scrambleNumbers, seed) {
-      var engine = { seeded: false, scramble: null, matcher: null, hasText: null };
-      var cache = {};
-      var scrambler;
-      if (typeof createScrambler === "function") {
-        scrambler = createScrambler(seed === undefined ? { scrambleNumbers: scrambleNumbers } : { scrambleNumbers: scrambleNumbers, seed: seed });
-        engine.seeded = true;
-        engine.scramble = function (text, filter) {
+      var scrambler = createScrambler(seed === undefined ? { scrambleNumbers: scrambleNumbers } : { scrambleNumbers: scrambleNumbers, seed: seed });
+      return {
+        scramble: function (text, filter) {
           return String(filter ? scrambler.scramble(text, filter) : scrambler.scramble(text));
-        };
-      } else {
-        engine.scramble = function (text, filter) {
-          if (!filter) return scrambleContents(text, scrambleNumbers, cache);
-          return text.replace(/[A-Za-z0-9]+/g, function (token) {
-            return filter(token) ? scrambleContents(token, scrambleNumbers, cache) : token;
-          });
-        };
-      }
-      engine.matcher = typeof createWordMatcher === "function" ? function (entries) {
-        return createWordMatcher(entries);
-      } : fallbackWordMatcher;
-      engine.hasText = typeof hasScramblableText === "function" ? function (text) {
-        return Boolean(hasScramblableText(text, { scrambleNumbers: scrambleNumbers }));
-      } : function (text) {
-        return Boolean(hasScramblableContents(text, scrambleNumbers));
+        },
+        matcher: function (entries) {
+          return createWordMatcher(entries);
+        },
+        hasText: function (text) {
+          return Boolean(hasScramblableText(text, { scrambleNumbers: scrambleNumbers }));
+        }
       };
-      return engine;
     }
 
     // Collecting (collect.ts): every piece of text a run should change, without changing anything.
@@ -1186,9 +1155,6 @@
         for (index = 0; index < allNames.length; index += 1) {
           if (engine.hasText(allNames[index].source)) names.push(allNames[index]);
         }
-      }
-      if (!engine.seeded && options.seed !== undefined && options.seed !== "") {
-        report.notes.push("This copy of the script cannot repeat a seed yet, so the invented words are new each time.");
       }
 
       // One engine per run: a word becomes the same invented word in every frame, cell and note.
