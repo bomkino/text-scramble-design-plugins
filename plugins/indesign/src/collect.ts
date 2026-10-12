@@ -406,9 +406,12 @@ class Walker {
   }
 }
 
+/** True for a story's last frame or path. InDesign answers "nothing" with null or a NothingEnum. */
 export function isLastContainer(container: any): boolean {
   const next = read(() => container.nextTextFrame, null);
-  return !next || next.isValid === false;
+  if (!next || !isValid(next)) return true;
+  const type = constructorName(next);
+  return !(FRAME_TYPES.has(type) || type === "TextPath");
 }
 
 export function collectTargets(app: any, options: CollectOptions): Collection {
