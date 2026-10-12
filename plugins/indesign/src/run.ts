@@ -218,7 +218,10 @@ export function runScramble(host: InDesignHost, options: RunOptions): ScrambleRe
     const output = scrambleSegments(target.source, plan, scramble);
     if (output !== target.source) writes.push({ target, output });
   });
-  const nameOutputs = names.map((name) => scrambler.scramble(name.source));
+  // Bookmarks and anchors usually repeat headings, so they follow the "keep readable" rule: with kept
+  // styles, only listed words change in them. Text variables always scramble in full.
+  const keepNames = (options.keepStyles ?? []).length > 0;
+  const nameOutputs = names.map((name) => scramble(name.source, keepNames && name.kind !== "variable"));
 
   report.empty = emptyReason(app, options, writes.length + names.length, report.skipped);
   if (report.empty === "nothing-to-scramble" && targets.length && report.keptParagraphs) report.empty = "all-kept";

@@ -306,6 +306,18 @@ test("keep readable: kept paragraph styles stay, listed words still change", () 
   assert.equal(report.keptParagraphs, 1);
 });
 
+test("keep readable: bookmarks and anchors follow the rule, variables scramble in full", () => {
+  const f = deck();
+  const bookmark = f.document.bookmark("Northwind Annual Review");
+  const anchor = f.document.anchor("Northwind Annual Review");
+  const client = f.document.variable("Client", "Northwind Traders");
+  run(f.app, { scope: "document", keepStyles: ["Headline"], alwaysScramble: ["Northwind"], seed: 10 });
+  const headline = f.article.contents.split("\r")[0];
+  assert.equal(bookmark.name, headline);
+  assert.equal(anchor.name, headline);
+  assert.ok(!client.variableOptions.contents.includes("Traders"));
+});
+
 test("keep readable: a frame that starts mid-paragraph lines up with its paragraphs", () => {
   const { app, document } = createInDesign();
   const [page1, page2] = document.spread(["1", "2"]).pages;
