@@ -313,6 +313,7 @@ export const COMMON_WORDS: readonly string[] = [
   "tan",
   "tape",
   "tar",
+  "ten",
   "text",
   "than",
   "that",

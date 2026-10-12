@@ -94,6 +94,17 @@ function isSafeDomain(lastTwo) {
   return lastTwo === "example.com" || lastTwo === "example.net" || lastTwo === "example.org";
 }
 
+// Without "@", "://" or "www.", a domain also needs its ending in lower case or the whole domain in capitals
+// ("studio.design", "NORTH-STAR.STUDIO"). A capitalised ending is a missing space after a full stop far more
+// often than an address: "the end.Next week", "the file.App runs".
+function writtenLikeADomain(tokens, start, end, ending) {
+  if (ending === lowercaseText(ending)) return true;
+  var text = "";
+  var index;
+  for (index = start; index < end; index += 1) text += tokens[index].text;
+  return text === uppercaseText(text);
+}
+
 function safeEnding(length) {
   var exact = length < SAFE_ENDINGS_BY_LENGTH.length ? SAFE_ENDINGS_BY_LENGTH[length] : null;
   if (exact) return { ending: exact, filler: 0 };
@@ -153,11 +164,13 @@ function planWebAddresses(tokens, scrambles) {
       tokenTextAt(tokens, index - 1) === "/" && tokenTextAt(tokens, index - 2) === "/" && tokenTextAt(tokens, index - 3) === ":";
     var startsWithWww = labelText(tokens, labels[0]) === "www";
     var endingIndex = labels[labels.length - 1][0];
-    var ending = lowercaseText(tokens[endingIndex].text);
+    var source = tokens[endingIndex].text;
+    var ending = lowercaseText(source);
     // "first.last@" is the name part of an email, not a domain.
     if (tokenTextAt(tokens, domainEnd) === "@") continue;
     var known = hasEntry(KNOWN_ENDINGS, ending) || hasEntry(SAFE_ENDINGS, ending);
-    if (!afterAt && !afterScheme && !startsWithWww && !known) continue;
+    var bare = known && writtenLikeADomain(tokens, labels[0][0], domainEnd, source);
+    if (!afterAt && !afterScheme && !startsWithWww && !bare) continue;
 
     index = domainEnd - 1;
     var lastTwo = labelText(tokens, labels[labels.length - 2]) + "." + ending;
@@ -185,7 +198,6 @@ function planWebAddresses(tokens, scrambles) {
     if (startsWithWww) {
       for (position = labels[0][0]; position < labels[0][1]; position += 1) plans[position] = { keep: true };
     }
-    var source = tokens[endingIndex].text;
     var upper = source === uppercaseText(source) && source !== lowercaseText(source);
     var safe = safeEnding(codePointCount(source));
     var text = upper
