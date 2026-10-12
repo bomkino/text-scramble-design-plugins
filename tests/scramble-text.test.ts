@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { estimateVisualWidth, hasScramblableText, scrambleText, scrambleTexts } from "../packages/core/src/scramble-text";
+import { COMMON_WORDS } from "../packages/core/src/word-lists";
 
 function seededRandom(seed: number): () => number {
   let state = seed >>> 0;
@@ -241,4 +242,24 @@ test("avoids obvious short words and unwelcome fragments", () => {
     assert.ok(words.every((word) => !commonWords.has(word)));
     assert.ok(words.every((word) => unwelcomeFragments.every((fragment) => !word.includes(fragment))));
   }
+});
+
+test("never invents a word from the shared common-word list", () => {
+  const source =
+    "The ten families arrive for dinner. Ruby notes the rose on the table, names every guest, " +
+    "and none of them can sit still. Time runs; the men made a plan, and the mood turned rude.";
+  const common = new Set(COMMON_WORDS);
+
+  for (let seed = 1; seed <= 60; seed++) {
+    const words =
+      scrambleText(source, { random: seededRandom(seed) })
+        .toLowerCase()
+        .match(/[a-z]+/g) ?? [];
+    for (const word of words) assert.ok(!common.has(word), `Invented the real word "${word}" with seed ${seed}.`);
+  }
+});
+
+test("keeps the shared common-word list lowercase, sorted and unique", () => {
+  assert.deepEqual([...COMMON_WORDS], [...new Set(COMMON_WORDS)].sort());
+  assert.ok(COMMON_WORDS.every((word) => /^[a-z]+$/.test(word)));
 });

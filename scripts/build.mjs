@@ -25,6 +25,28 @@ async function renderIcon(output, size) {
   await rm(rendered, { force: true });
 }
 
+// The classic JSX runs in ExtendScript (ES3), so it cannot import the core. Inject the shared word
+// lists instead, so the JSX blocks exactly the words the Figma and UXP builds block.
+async function buildLegacyScript() {
+  const bundled = await build({
+    entryPoints: [path.join(root, "packages", "core", "src", "word-lists.ts")],
+    bundle: true,
+    write: false,
+    format: "esm",
+    platform: "neutral",
+  });
+  const lists = await import(`data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString("base64")}`);
+  let script = await readFile(path.join(indesign, "src", "Text Scramble.jsx"), "utf8");
+  const inject = (marker, name, words) => {
+    const pattern = new RegExp(`^(\\s*)var ${name} = \\[\\]; // @build:${marker}$`, "m");
+    if (!pattern.test(script)) throw new Error(`Text Scramble.jsx is missing the @build:${marker} line.`);
+    script = script.replace(pattern, (_, indent) => `${indent}var ${name} = ${JSON.stringify(words)};`);
+  };
+  inject("common-words", "COMMON_WORDS", lists.COMMON_WORDS);
+  inject("unwelcome-fragments", "UNWELCOME_FRAGMENTS", lists.UNWELCOME_FRAGMENTS);
+  return script;
+}
+
 await clean(path.join(figma, "dist"));
 await clean(path.join(indesign, "dist"));
 
@@ -66,7 +88,7 @@ await build({
   legalComments: "none",
   banner: { js: "/* Text Scramble for InDesign Scripts panel · MIT · pitch.dog */" },
 });
-await cp(path.join(indesign, "src", "Text Scramble.jsx"), path.join(indesign, "dist", "Text Scramble.jsx"));
+await writeFile(path.join(indesign, "dist", "Text Scramble.jsx"), await buildLegacyScript());
 await cp(path.join(indesign, "src", "index.html"), path.join(indesign, "dist", "index.html"));
 await mkdir(path.join(indesign, "dist", "icons"), { recursive: true });
 await cp(path.join(root, "assets", "icon.svg"), path.join(indesign, "dist", "icons", "icon.svg"));
