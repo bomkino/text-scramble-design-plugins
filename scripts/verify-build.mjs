@@ -59,36 +59,96 @@ assert.match(indesignLegacy, /function hasScramblableContents/);
 // and JSON are missing, and Object.prototype carries watch, unwatch, toSource and reflect. Parse it
 // as ES3 and run its engine in a sandbox that behaves the same way (scripts/extendscript-sandbox.mjs).
 const legacySource = indesignLegacy.replace(/^#target .*$/m, "");
-parse(legacySource, { ecmaVersion: 3, allowReserved: "never" });
+const legacyProgram = parse(legacySource, { ecmaVersion: 3, allowReserved: "never" });
 const engineMatch = legacySource.match(/\/\/ @engine:start\n([\s\S]*?)\/\/ @engine:end/);
 assert.ok(engineMatch, "Text Scramble.jsx must keep its @engine:start and @engine:end markers.");
 assert.match(legacySource, /\/\/ @engine:end\n[\s\S]*\/\/ @document:start\n[\s\S]*?\/\/ @document:end/, "Text Scramble.jsx must keep its document-walking code between @document:start and @document:end, after the engine.");
-const sandbox = createExtendScriptContext();
-const legacy = vm.runInContext(
-  `(function () {\n${engineMatch[1]}\nreturn { scrambleContents: scrambleContents, COMMON_WORDS: COMMON_WORDS, UNWELCOME_FRAGMENTS: UNWELCOME_FRAGMENTS };\n})()`,
-  sandbox,
-);
-const bundledLists = await build({
-  entryPoints: [path.join(root, "packages", "core", "src", "word-lists.ts")],
-  bundle: true,
-  write: false,
-  format: "esm",
-  platform: "neutral",
-});
-const lists = await import(`data:text/javascript;base64,${Buffer.from(bundledLists.outputFiles[0].text).toString("base64")}`);
-assert.deepEqual(Array.from(legacy.COMMON_WORDS), [...lists.COMMON_WORDS]);
-assert.deepEqual(Array.from(legacy.UNWELCOME_FRAGMENTS), [...lists.UNWELCOME_FRAGMENTS]);
-const legacyProbe = "Watch the reflect toSource unwatch constructor valueOf: Sloane, Ruby and the ten roses, 2026.";
-const common = new Set(lists.COMMON_WORDS);
-for (let run = 0; run < 40; run++) {
-  const cache = vm.runInContext("({})", sandbox);
-  const output = legacy.scrambleContents(legacyProbe, true, cache);
-  assert.equal(output.replace(/[A-Za-z]/g, "L").replace(/[0-9]/g, "N"), legacyProbe.replace(/[A-Za-z]/g, "L").replace(/[0-9]/g, "N"));
-  for (const word of output.toLowerCase().match(/[a-z]+/g) ?? []) {
-    assert.ok(!common.has(word), `Legacy JSX produced the real word "${word}".`);
-    assert.ok(lists.UNWELCOME_FRAGMENTS.every((fragment) => !word.includes(fragment)), `Legacy JSX produced "${word}".`);
+assert.ok(/^[\t\n\r\x20-\x7e]*$/.test(engineMatch[1]), "The JSX engine block must be ASCII.");
+
+// The engine shares the script's function scope with the document code and the dialog, so no name may be
+// declared twice there: a second declaration would silently replace the first.
+const scriptBody = legacyProgram.body[0].expression.callee.body.body;
+const engineStart = engineMatch.index;
+const engineEnd = engineMatch.index + engineMatch[0].length;
+const declaredNames = new Map();
+for (const statement of scriptBody) {
+  const names =
+    statement.type === "FunctionDeclaration"
+      ? [statement.id.name]
+      : statement.type === "VariableDeclaration"
+        ? statement.declarations.map((declaration) => declaration.id.name)
+        : [];
+  const inEngine = statement.start >= engineStart && statement.end <= engineEnd;
+  for (const name of names) {
+    const other = declaredNames.get(name);
+    assert.ok(other === undefined || (!other && !inEngine), `Text Scramble.jsx declares ${name} more than once${inEngine || other ? " (in the engine block)" : ""}.`);
+    declaredNames.set(name, inEngine);
   }
 }
+
+const sandbox = createExtendScriptContext();
+const legacy = vm.runInContext(
+  `(function () {\n${engineMatch[1]}\nreturn { createScrambler: createScrambler, createSeededRandom: createSeededRandom, createWordMatcher: createWordMatcher, hasScramblableText: hasScramblableText, scrambleContents: scrambleContents, hasScramblableContents: hasScramblableContents, COMMON_WORDS: COMMON_WORDS, UNWELCOME_FRAGMENTS: UNWELCOME_FRAGMENTS, TOP_LEVEL_DOMAINS: TOP_LEVEL_DOMAINS };\n})()`,
+  sandbox,
+);
+async function importBundled(entry) {
+  const bundled = await build({ entryPoints: [entry], bundle: true, write: false, format: "esm", platform: "neutral" });
+  return import(`data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString("base64")}`);
+}
+const lists = await importBundled(path.join(root, "packages", "core", "src", "word-lists.ts"));
+const { TOP_LEVEL_DOMAINS } = await importBundled(path.join(root, "packages", "core", "src", "top-level-domains.ts"));
+const core = await importBundled(path.join(root, "packages", "core", "src", "scramble-text.ts"));
+assert.deepEqual(Array.from(legacy.COMMON_WORDS), [...lists.COMMON_WORDS]);
+assert.deepEqual(Array.from(legacy.UNWELCOME_FRAGMENTS), [...lists.UNWELCOME_FRAGMENTS]);
+assert.deepEqual(Array.from(legacy.TOP_LEVEL_DOMAINS), [...TOP_LEVEL_DOMAINS]);
+
+// The JSX engine must reproduce every shared test vector, and match the core on random text.
+const vectors = JSON.parse(await readFile(path.join(root, "packages", "core", "test-vectors.json"), "utf8"));
+for (const { inputs, options, outputs } of vectors) {
+  const scrambler = legacy.createScrambler(options);
+  assert.deepEqual(inputs.map((input) => scrambler.scramble(input)), outputs, `The JSX engine differs on the test vector with seed ${JSON.stringify(options.seed)}.`);
+}
+const parityPool = [
+  "Sloane", "ruby", "LISBON", "the", "ten", "a", "Stories", "rhythm", "Café", "re\u0301sume\u0301", "Đặng", "Việt", "Ångström",
+  "Łódź", "ǅuro", "İstanbul", "ıi", "Straße", "Æsir", "ﬁne", "Ελληνικά", "Русский", "й", "עברית", "東京", "한국어", "𝒜𝒷", "𐐀𐐨",
+  "watch", "unwatch", "toSource", "reflect", "constructor", "valueOf", "__proto__", "hasOwnProperty", "prototype",
+  "2026", "٢٠٢٦", "𝟚𝟘", "Ⅷ", "½", "²", "\u0301x", "2\u0301", "✦", "🙂", " — ", "…",
+  "hello@quellmoor.co", "https://www.quellmoor.co/work/autumn-menu?ref=deck", "north-star.studio", "NORTH-STAR.STUDIO",
+  "Ada.Quell@orchard.photography", "mailto:team@example.com", "demo.example.org", "shop.local", "Zoë@café.fr", "e.g.",
+  "Next.js", "first.last@quellmoor.com", "Quellmoor.Studio", "www.studio", "x@y.𐐀𐐨", "quellmoor.unknownending",
+];
+const separators = [" ", " ", ", ", ". ", "\n", "\t", "", "-", "@", ".", "/", ":"];
+const parityRandom = core.createSeededRandom("verify-build");
+const pickFrom = (items) => items[Math.floor(parityRandom() * items.length)];
+const randomText = () => Array.from({ length: 1 + Math.floor(parityRandom() * 8) }, () => pickFrom(parityPool) + pickFrom(separators)).join("");
+for (let trial = 0; trial < 150; trial++) {
+  // A seed, a seed with numbers kept, or an injected random source; and no filter, a list to scramble, or a
+  // list to keep.
+  const seeded = [{ seed: trial }, { seed: `deck ${trial}`, scrambleNumbers: false }, undefined][trial % 3];
+  const coreScrambler = core.createScrambler(seeded ?? { random: core.createSeededRandom(trial) });
+  const legacyScrambler = legacy.createScrambler(seeded ?? { random: legacy.createSeededRandom(trial) });
+  const entries = [pickFrom(parityPool), pickFrom(parityPool)];
+  const coreMatches = core.createWordMatcher(entries);
+  const legacyMatches = legacy.createWordMatcher(entries);
+  const [coreFilter, legacyFilter] = [
+    [undefined, undefined],
+    [coreMatches, legacyMatches],
+    [(token) => !coreMatches(token), (token) => !legacyMatches(token)],
+  ][Math.floor(trial / 3) % 3];
+  for (let text = 0; text < 3; text++) {
+    const input = randomText();
+    assert.equal(legacyScrambler.scramble(input, legacyFilter), coreScrambler.scramble(input, coreFilter), `The JSX engine differs from the core on ${JSON.stringify(input)}.`);
+    assert.equal(legacy.hasScramblableContents(input, trial % 2 === 0), core.hasScramblableText(input, { scrambleNumbers: trial % 2 === 0 }));
+  }
+}
+// The main code keeps calling scrambleContents with one cache object per run.
+const contentsProbe = "Watch the reflect toSource unwatch constructor valueOf: Sloane, Ruby and the ten roses, 2026.";
+const contentsCache = vm.runInContext("({})", sandbox);
+const contentsOutput = legacy.scrambleContents(contentsProbe, true, contentsCache);
+assert.equal(Array.from(contentsOutput).length, Array.from(contentsProbe).length);
+assert.notEqual(contentsOutput, contentsProbe);
+assert.equal(legacy.scrambleContents("Sloane", true, contentsCache), contentsOutput.split(": ")[1].split(",")[0]);
+assert.equal(legacy.scrambleContents("2026", false, vm.runInContext("({})", sandbox)), "2026");
 
 // The document code outside the engine must not call ES5 methods either, even on arrays that come
 // from InDesign (which the sandbox cannot strip), and must stay ASCII so any encoding reads it.
@@ -141,5 +201,6 @@ assert.match(figmaUi, /Formatting stays put/);
 assert.match(indesignUi, /Formatting stays put/);
 assert.ok((await stat(path.join(figma, "dist", "code.js"))).size < 100_000);
 assert.ok((await stat(path.join(indesign, "dist", "index.js"))).size < 100_000);
+assert.ok((await stat(path.join(indesign, "dist", "Text Scramble.jsx"))).size < 150_000);
 
-console.log("Build verified: manifests, privacy boundary, formatting paths, ExtendScript compatibility, a headless JSX run, UI, and bundle sizes.");
+console.log("Build verified: manifests, privacy boundary, formatting paths, ExtendScript compatibility and engine parity, a headless JSX run, UI, and bundle sizes.");
