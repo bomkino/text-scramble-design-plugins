@@ -21,6 +21,7 @@
     "icons": "node scripts/render-icons.mjs",
     "test": "node --import tsx --test tests/*.test.ts",
     "test-vectors": "node scripts/write-test-vectors.mjs",
+    "unicode-tables": "node scripts/unicode-tables.mjs",
     "update-tlds": "node scripts/update-top-level-domains.mjs",
     "typecheck": "tsc --noEmit",
     "verify": "npm run typecheck && npm test && npm run build && node scripts/verify-build.mjs",

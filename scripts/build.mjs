@@ -2,6 +2,7 @@ import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
+import { legacyEngineSource } from "./legacy-engine.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const figma = path.join(root, "plugins", "figma");
@@ -13,26 +14,31 @@ async function clean(directory) {
   await mkdir(directory, { recursive: true });
 }
 
-// The classic JSX runs in ExtendScript (ES3), so it cannot import the core. Inject the shared word
-// lists instead, so the JSX blocks exactly the words the Figma and UXP builds block.
+// The classic JSX runs in ExtendScript (ES3), so it cannot import the core. Its @engine block gets the ES3
+// port of the core instead (packages/core/es3, assembled by scripts/legacy-engine.mjs), with the shared word
+// lists and endings injected, so the JSX scrambles exactly as the Figma and UXP builds do.
+async function importBundled(entry) {
+  const bundled = await build({ entryPoints: [entry], bundle: true, write: false, format: "esm", platform: "neutral" });
+  return import(`data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString("base64")}`);
+}
+
 async function buildLegacyScript() {
-  const bundled = await build({
-    entryPoints: [path.join(root, "packages", "core", "src", "word-lists.ts")],
-    bundle: true,
-    write: false,
-    format: "esm",
-    platform: "neutral",
+  const lists = await importBundled(path.join(root, "packages", "core", "src", "word-lists.ts"));
+  const { TOP_LEVEL_DOMAINS } = await importBundled(path.join(root, "packages", "core", "src", "top-level-domains.ts"));
+  const engine = await legacyEngineSource({
+    commonWords: lists.COMMON_WORDS,
+    unwelcomeFragments: lists.UNWELCOME_FRAGMENTS,
+    topLevelDomains: TOP_LEVEL_DOMAINS,
   });
-  const lists = await import(`data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString("base64")}`);
-  let script = await readFile(path.join(indesign, "src", "Text Scramble.jsx"), "utf8");
-  const inject = (marker, name, words) => {
-    const pattern = new RegExp(`^(\\s*)var ${name} = \\[\\]; // @build:${marker}$`, "m");
-    if (!pattern.test(script)) throw new Error(`Text Scramble.jsx is missing the @build:${marker} line.`);
-    script = script.replace(pattern, (_, indent) => `${indent}var ${name} = ${JSON.stringify(words)};`);
-  };
-  inject("common-words", "COMMON_WORDS", lists.COMMON_WORDS);
-  inject("unwelcome-fragments", "UNWELCOME_FRAGMENTS", lists.UNWELCOME_FRAGMENTS);
-  return script;
+  const script = await readFile(path.join(indesign, "src", "Text Scramble.jsx"), "utf8");
+  const placeholder = /^( *)\/\/ @build:engine\n/m;
+  if (!placeholder.test(script)) throw new Error("Text Scramble.jsx is missing the // @build:engine line.");
+  return script.replace(placeholder, (_, indent) =>
+    engine
+      .split("\n")
+      .map((line) => (line ? indent + line : line))
+      .join("\n") + "\n",
+  );
 }
 
 await clean(path.join(figma, "dist"));
