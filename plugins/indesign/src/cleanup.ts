@@ -22,6 +22,8 @@ export interface CleanupReport {
 
 export const EXAMPLE_LINK = "https://example.com/";
 export const EXAMPLE_EMAIL = "mailto:hello@example.com";
+/** What the document title becomes when InDesign won't take an empty one. */
+export const NEUTRAL_TITLE = "Untitled";
 
 function read<T>(read: () => T, fallback: T): T {
   try {
@@ -100,20 +102,28 @@ export function cleanDocument(document: any): CleanupReport {
     if (rename(destination, `Page link ${index + 1}`, used)) report.renamed++;
   });
 
+  // InDesign quietly ignores an empty value for some fields (the document title, for one), so a field
+  // that still holds text afterwards gets a neutral placeholder instead.
   const metadata = read(() => document.metadataPreferences, null);
   if (metadata) {
-    const fields: Array<[string, unknown]> = [
-      ["documentTitle", ""],
-      ["author", ""],
-      ["description", ""],
-      ["keywords", []],
-      ["copyrightNotice", ""],
-      ["copyrightInfoURL", ""],
-      ["jobName", ""],
+    const fields: Array<[string, unknown, string | null]> = [
+      ["documentTitle", "", NEUTRAL_TITLE],
+      ["author", "", "Unknown"],
+      ["description", "", "None"],
+      ["keywords", [], null],
+      ["copyrightNotice", "", "None"],
+      ["copyrightInfoURL", "", EXAMPLE_LINK],
+      ["jobName", "", NEUTRAL_TITLE],
     ];
-    for (const [field, empty] of fields) {
+    for (const [field, empty, neutral] of fields) {
       try {
-        metadata[field] = empty;
+        try {
+          metadata[field] = empty;
+        } catch (error) {
+          if (neutral === null) throw error;
+        }
+        const left = read(() => metadata[field], "");
+        if (neutral !== null && typeof left === "string" && left !== "") metadata[field] = neutral;
         report.documentInfo = true;
       } catch {
         // Not every InDesign version exposes every field.

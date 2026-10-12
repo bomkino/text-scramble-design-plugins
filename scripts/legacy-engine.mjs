@@ -1,4 +1,4 @@
-// Assembles the ES3 engine that scripts/build.mjs puts between the @engine markers of the classic InDesign
+// Assembles the ES3 engine that scripts/build.mjs puts between the [engine:start] and [engine:end] markers of the classic InDesign
 // JSX: the shared word lists and endings from packages/core/src, the generated Unicode tables, and the
 // hand-written ES3 port in packages/core/es3. tests/legacy-engine.test.ts loads the same source into a
 // sandbox, so what the tests check is what ships.

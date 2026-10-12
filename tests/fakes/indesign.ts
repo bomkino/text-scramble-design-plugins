@@ -22,6 +22,11 @@ export class World {
   }
 }
 
+/** The same object, reached by index: everything reads and writes through, but toSpecifier() differs. */
+function byIndex<T extends object>(item: T, spec: string): T {
+  return new Proxy(item, { get: (target, key) => (key === "toSpecifier" ? () => spec : Reflect.get(target, key)) });
+}
+
 export class Collection<T> {
   constructor(private readonly items: () => T[]) {}
   get length(): number {
@@ -668,9 +673,12 @@ export class Document {
     for (const key of Object.keys(fields)) {
       Object.defineProperty(this.metadataPreferences, key, {
         enumerable: true,
+        configurable: true,
         get: () => fields[key],
         set: (value) => {
           world.assertInScript("Document info");
+          // Like InDesign, an empty title is quietly ignored.
+          if (key === "documentTitle" && value === "") return;
           fields[key] = value;
         },
       });
@@ -782,8 +790,16 @@ export class Document {
   }
 
   // The DOM surface Text Scramble reads.
+  /**
+   * Like InDesign, document.stories.item(i) names the story by its index ("/document/story[0]"), while
+   * frame.parentStory names the same story by its id. Code that dedupes by specifier sees two stories.
+   */
   get stories(): Collection<Story> {
-    return new Collection(() => this.storyList.filter((story) => !this.unlistedStories.has(story)));
+    return new Collection(() =>
+      this.storyList
+        .filter((story) => !this.unlistedStories.has(story))
+        .map((story, index) => byIndex(story, `/document/story[${index}]`)),
+    );
   }
   get pages(): Collection<Page> {
     return new Collection(() => this.spreads.flatMap((spread) => spread.pages));

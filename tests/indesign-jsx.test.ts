@@ -8,6 +8,7 @@ import test, { before } from "node:test";
 import vm from "node:vm";
 import {
   createExtendScriptContext,
+  directiveCommentLines,
   es3Problems,
   extractSections,
   runJsx,
@@ -45,7 +46,7 @@ function withEngine(engine: string): string {
   return SOURCE.replace(SECTIONS.engine, () => engine);
 }
 
-// The engine that ships: the ES3 port of the core that scripts/build.mjs puts in the @engine block.
+// The engine that ships: the ES3 port of the core that scripts/build.mjs puts in the engine block.
 const FILE_ENGINE: Engine = { name: "engine in the file", source: "", globals: {}, matchesCore: true };
 // The TypeScript core itself, handed in from Node.
 const CORE_ENGINE: Engine = {
@@ -341,12 +342,21 @@ test("the sandbox behaves like ExtendScript", () => {
   assert.equal(probe, "undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,function,object,true");
 });
 
+test("no line starts with // @, which ExtendScript reads as an unknown directive and refuses to load", () => {
+  assert.deepEqual(directiveCommentLines(SOURCE), []);
+  assert.deepEqual(directiveCommentLines(FILE_ENGINE.source), [], "the injected engine neither");
+  assert.deepEqual(directiveCommentLines("var a = 1; // @ at the end is fine\n  //@include other.jsx\n// an @ later is fine\n\t// @document:start\n"), [2, 4]);
+  // The sandbox refuses such a script the way InDesign does, so every other test would fail too.
+  const broken = FILE_ENGINE.source.replace("// [document:start]", "// @document:start");
+  assert.throws(() => runJsx(broken), /unknown preprocessor directive/);
+});
+
 test("the script is ES3, with no ES5 calls outside the engine and only example.com addresses", () => {
   assert.deepEqual(es3Problems(SOURCE, { skipSections: ["engine"], strictIndexOf: true }), []);
   assert.match(SECTIONS.document, /function runTextScramble\(settings\)/);
   assert.match(SECTIONS.document, /UndoModes\.ENTIRE_SCRIPT/);
   assert.doesNotMatch(SOURCE, /\.save\(|\.close\(/, "the script never saves or closes a document");
-  assert.doesNotMatch(SOURCE.slice(SOURCE.indexOf("// @engine:end")), /[^\x00-\x7F]/, "ASCII only, so the file reads the same in any encoding");
+  assert.doesNotMatch(SOURCE.slice(SOURCE.indexOf("// [engine:end]")), /[^\x00-\x7F]/, "ASCII only, so the file reads the same in any encoding");
   const addresses = SOURCE.match(/[a-z]+:\/\/[^\s"'/]+|[\w.-]+@[\w-]+\.[\w.-]+/gi) ?? [];
   assert.ok(addresses.length > 0);
   for (const address of addresses) assert.match(address, /example\.com$/, address);
@@ -460,6 +470,19 @@ for (const engine of ENGINES) {
     assert.ok(d.world.recomposed > 0);
   });
 
+  test(`document: each story is scrambled and counted once, however InDesign names it (${engine.name})`, () => {
+    const { app, document } = createInDesign();
+    const [page1, page2] = document.spread(["1", "2"]).pages;
+    const article = document.story("Brindlewick grew in every region and kept going past the frame.");
+    document.frame(page1, article, { capacity: 20 });
+    document.frame(page2, article);
+    document.frame(page1, document.story("Quellmoor Orchard opened three rooms."));
+    const report = jsx(engine, app, { scope: "document", seed: 22 });
+    assert.equal(report.changed, 2);
+    assert.equal(report.kinds.story, 2);
+    assert.equal(report.characters, Array.from(article.contents).length + "Quellmoor Orchard opened three rooms.".length);
+  });
+
   test(`document: locked and hidden switches (${engine.name})`, () => {
     const locked = deck();
     const lockedGroup = locked.document.group(locked.page2);
@@ -547,11 +570,24 @@ for (const engine of ENGINES) {
     assert.deepEqual(d.document.urlDestinations.map((destination) => destination.name), ["Link 1", "Link 2"]);
     assert.deepEqual(d.document.hyperlinkList.map((link) => link.name), ["Hyperlink 1", "Hyperlink 2"]);
     assert.equal(d.document.pageDestinations[0].name, "Page link 1");
-    for (const key of ["documentTitle", "author", "description", "copyrightNotice", "copyrightInfoURL", "jobName"]) {
+    for (const key of ["author", "description", "copyrightNotice", "copyrightInfoURL", "jobName"]) {
       assert.equal(d.document.metadataPreferences[key], "", key);
     }
+    assert.equal(d.document.metadataPreferences.documentTitle, "Untitled", "InDesign ignores an empty title, so it gets a neutral one");
     assert.deepEqual(Array.from(d.document.metadataPreferences.keywords as ArrayLike<unknown>), []);
     assert.deepEqual(report.cleanup, { links: 2, renamed: 5, documentInfo: true });
+
+    const refusing = deck();
+    let title = "Brindlewick deck";
+    Object.defineProperty(refusing.document.metadataPreferences, "documentTitle", {
+      get: () => title,
+      set: (value: string) => {
+        if (value === "") throw new Error("Invalid value for documentTitle.");
+        title = value;
+      },
+    });
+    assert.deepEqual(jsx(engine, refusing.app, { scope: "document", cleanup: true }).errors, []);
+    assert.equal(title, "Untitled", "a title that refuses to be emptied gets a neutral one");
 
     const off = deck();
     jsx(engine, off.app, { scope: "document" });

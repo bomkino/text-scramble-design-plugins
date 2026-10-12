@@ -241,6 +241,22 @@ test("document: reaches every story, table, footnote, path and parent page", () 
   assert.equal(f.app.doScriptCalls.length, 1);
 });
 
+test("document: each story is scrambled and counted once, however InDesign names it", () => {
+  const { app, document } = createInDesign();
+  const [page1, page2] = document.spread(["1", "2"]).pages;
+  const article = document.story("Brindlewick grew in every region and kept going past the frame.");
+  const first = document.frame(page1, article, { capacity: 20 });
+  document.frame(page2, article);
+  document.frame(page1, document.story("Quellmoor Orchard opened three rooms."));
+  // document.stories names each story by index, its frames' parentStory by id: still two stories.
+  assert.notEqual(document.stories.item(0)!.toSpecifier(), first.parentStory.toSpecifier());
+  assert.equal(inspectScope(hostFor(app), { scope: "document" }).targets, 2);
+  const report = run(app, { scope: "document", seed: 22 });
+  assert.equal(report.changed, 2);
+  assert.equal(report.kinds.story, 2);
+  assert.equal(report.characters, Array.from(article.contents).length + "Quellmoor Orchard opened three rooms.".length);
+});
+
 test("document: locked layers and frames are unlocked for the edit and locked again", () => {
   const f = deck();
   run(f.app, { scope: "document", seed: 6 });
@@ -423,13 +439,31 @@ test("cleanup: links point at example.com, names go neutral, document info clear
   assert.deepEqual(f.document.urlDestinations.map((destination) => destination.name), ["Link 1", "Link 2"]);
   assert.deepEqual(f.document.hyperlinkList.map((link) => link.name), ["Hyperlink 1", "Hyperlink 2"]);
   assert.equal(f.document.pageDestinations[0].name, "Page link 1");
-  for (const key of ["documentTitle", "author", "description", "copyrightNotice", "copyrightInfoURL", "jobName"]) {
+  for (const key of ["author", "description", "copyrightNotice", "copyrightInfoURL", "jobName"]) {
     assert.equal(f.document.metadataPreferences[key], "", key);
   }
+  assert.equal(f.document.metadataPreferences.documentTitle, "Untitled", "InDesign ignores an empty title, so it gets a neutral one");
   assert.deepEqual(f.document.metadataPreferences.keywords, []);
   assert.deepEqual(report.cleanup, { links: 2, renamed: 5, documentInfo: true });
   const everyAddress = f.document.urlDestinations.map((destination) => destination.destinationURL).join(" ");
   assert.ok(!/brindlewick/i.test(everyAddress));
+});
+
+test("cleanup: a title InDesign refuses to empty gets a neutral one", () => {
+  const f = deck();
+  let title = "Brindlewick deck";
+  Object.defineProperty(f.document.metadataPreferences, "documentTitle", {
+    get: () => title,
+    set: (value: string) => {
+      if (value === "") throw new Error("Invalid value for documentTitle.");
+      title = value;
+    },
+  });
+  const report = run(f.app, { scope: "document", cleanup: true, seed: 14 });
+  assert.equal(title, "Untitled");
+  assert.equal(f.document.metadataPreferences.author, "");
+  assert.equal(report.cleanup?.documentInfo, true);
+  assert.deepEqual(report.errors, []);
 });
 
 test("cleanup is off by default and works on its own", () => {

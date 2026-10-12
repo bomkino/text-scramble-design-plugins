@@ -90,18 +90,33 @@ export function fromContextValue(value) {
 }
 
 /** Strips ExtendScript preprocessor lines such as `#target "InDesign"`, which are not JavaScript. */
+// ExtendScript reads a line comment that starts with @ (//@include, //@target, // @anything) as a
+// preprocessor directive, and stops the whole script with "Syntax error" on one it doesn't know.
+const DIRECTIVE_COMMENT = /^\s*\/\/\s*@/;
+
+/** 1-based numbers of the lines ExtendScript would read as preprocessor directives. */
+export function directiveCommentLines(source) {
+  return source.split(/\r\n|\r|\n/).flatMap((line, index) => (DIRECTIVE_COMMENT.test(line) ? [index + 1] : []));
+}
+
+/**
+ * Drops the #target line, as ExtendScript does. Throws like ExtendScript on a `// @` line, so no test
+ * can pass with a script that would not load in InDesign.
+ */
 export function stripDirectives(source) {
+  const lines = directiveCommentLines(source);
+  if (lines.length) throw new SyntaxError(`ExtendScript reads line ${lines.join(", ")} as an unknown preprocessor directive ("// @").`);
   return source.replace(/^#target.*$/gm, "");
 }
 
-const SECTION = /\/\/ @([\w-]+):start\n([\s\S]*?)\/\/ @\1:end/g;
+const SECTION = /\/\/ \[([\w-]+):start\]\n([\s\S]*?)\/\/ \[\1:end\]/g;
 
-/** Every `// @name:start` … `// @name:end` section of a source, by name. */
+/** Every `// [name:start]` … `// [name:end]` section of a source, by name. */
 export function extractSections(source, required = []) {
   const sections = {};
   for (const match of source.matchAll(SECTION)) sections[match[1]] = match[2];
   for (const name of required) {
-    if (!(name in sections)) throw new Error(`The script is missing its @${name}:start … @${name}:end section.`);
+    if (!(name in sections)) throw new Error(`The script is missing its [${name}:start] … [${name}:end] section.`);
   }
   return sections;
 }
@@ -157,8 +172,8 @@ export function es3Problems(source, { skipSections = [], strictIndexOf = false }
   const ast = parse(code, { ecmaVersion: 3, allowReserved: "never", locations: true });
   const skipped = [];
   for (const name of skipSections) {
-    const start = code.indexOf(`// @${name}:start`);
-    const end = code.indexOf(`// @${name}:end`);
+    const start = code.indexOf(`// [${name}:start]`);
+    const end = code.indexOf(`// [${name}:end]`);
     if (start >= 0 && end > start) skipped.push([start, end]);
   }
   const problems = [];

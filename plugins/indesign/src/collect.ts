@@ -107,6 +107,19 @@ function specifier(item: any, fallback: string): string {
   return read(() => (typeof item.toSpecifier === "function" ? String(item.toSpecifier()) : ""), "") || fallback;
 }
 
+const ID_KEYED = new Set([...FRAME_TYPES, "TextPath", "Story"]);
+
+/**
+ * A key that names the same object however it was reached. InDesign's specifier depends on the path:
+ * document.stories.item(0) is "story[0]" but a frame's parentStory is "story[@id=233]". Stories, frames
+ * and text paths have an id that is unique in the document, so they are keyed by it.
+ */
+function identity(item: any, fallback: string): string {
+  const type = constructorName(item);
+  const id = read(() => item.id, null);
+  return ID_KEYED.has(type) && typeof id === "number" ? `${type}#${id}` : specifier(item, fallback);
+}
+
 export function codePoints(text: string): string[] {
   return Array.from(text);
 }
@@ -204,7 +217,7 @@ class Walker {
   }
 
   private countSkip(container: any, reason: "locked" | "hidden"): void {
-    const key = specifier(container, `container-${this.seenContainers.size}`);
+    const key = identity(container, `container-${this.seenContainers.size}`);
     if (this.seenContainers.has(key)) return;
     this.seenContainers.add(key);
     this.skipped[reason]++;
@@ -212,14 +225,14 @@ class Walker {
 
   private rememberStory(story: any): void {
     if (!isValid(story)) return;
-    const key = specifier(story, `story-${this.seenStories.size}`);
+    const key = identity(story, `story-${this.seenStories.size}`);
     if (this.seenStories.has(key)) return;
     this.seenStories.add(key);
     this.stories.push(story);
   }
 
   private addTarget(text: any, offset: number, source: string, kind: TargetKind, unlock: any[], onParentPage: boolean): void {
-    const key = `${specifier(text, `text-${this.seenTargets.size}`)}@${offset}`;
+    const key = `${identity(text, `text-${this.seenTargets.size}`)}@${offset}`;
     if (this.seenTargets.has(key)) return;
     this.seenTargets.add(key);
     this.targets.push({ text, offset, source, kind, key, onParentPage, unlock });
@@ -258,7 +271,7 @@ class Walker {
   /** A text frame or text path: its visible text, plus the overset text if it ends the story. */
   addContainer(container: any, kind: TargetKind): void {
     if (!isValid(container)) return;
-    const key = specifier(container, `container-${this.seenContainers.size}`);
+    const key = identity(container, `container-${this.seenContainers.size}`);
     if (this.seenContainers.has(key)) return;
     const eligibility = this.eligibility(container);
     if (eligibility.skip) {
@@ -362,7 +375,7 @@ class Walker {
    */
   addStory(story: any): void {
     if (!isValid(story)) return;
-    const key = specifier(story, `story-${this.seenStories.size}`);
+    const key = identity(story, `story-${this.seenStories.size}`);
     if (this.seenStories.has(key)) return;
     const containers = collectionItems(read(() => story.textContainers, null));
     if (!containers.length) {
@@ -382,7 +395,7 @@ class Walker {
     }
     this.rememberStory(story);
     eligible.forEach(({ container }) => {
-      const containerKey = specifier(container, `container-${this.seenContainers.size}`);
+      const containerKey = identity(container, `container-${this.seenContainers.size}`);
       if (this.seenContainers.has(containerKey)) return;
       this.seenContainers.add(containerKey);
       this.containers.push(container);
