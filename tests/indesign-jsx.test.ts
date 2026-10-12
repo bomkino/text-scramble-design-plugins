@@ -359,7 +359,8 @@ test("the script is ES3, with no ES5 calls outside the engine and only example.c
   assert.doesNotMatch(SOURCE.slice(SOURCE.indexOf("// [engine:end]")), /[^\x00-\x7F]/, "ASCII only, so the file reads the same in any encoding");
   const addresses = SOURCE.match(/[a-z]+:\/\/[^\s"'/]+|[\w.-]+@[\w-]+\.[\w.-]+/gi) ?? [];
   assert.ok(addresses.length > 0);
-  for (const address of addresses) assert.match(address, /example\.com$/, address);
+  // The one other address is the Dublin Core XMP namespace, a name InDesign needs to clear the title.
+  for (const address of addresses) assert.match(address, /example\.com$|^http:\/\/purl\.org$/, address);
   assert.deepEqual(es3Problems("var a = [].map(function () {}); var b = JSON; var c = /\\p{L}/;").length, 3, "the linter itself works");
 });
 
@@ -570,10 +571,9 @@ for (const engine of ENGINES) {
     assert.deepEqual(d.document.urlDestinations.map((destination) => destination.name), ["Link 1", "Link 2"]);
     assert.deepEqual(d.document.hyperlinkList.map((link) => link.name), ["Hyperlink 1", "Hyperlink 2"]);
     assert.equal(d.document.pageDestinations[0].name, "Page link 1");
-    for (const key of ["author", "description", "copyrightNotice", "copyrightInfoURL", "jobName"]) {
+    for (const key of ["documentTitle", "author", "description", "copyrightNotice", "copyrightInfoURL", "jobName"]) {
       assert.equal(d.document.metadataPreferences[key], "", key);
     }
-    assert.equal(d.document.metadataPreferences.documentTitle, "Untitled", "InDesign ignores an empty title, so it gets a neutral one");
     assert.deepEqual(Array.from(d.document.metadataPreferences.keywords as ArrayLike<unknown>), []);
     assert.deepEqual(report.cleanup, { links: 2, renamed: 5, documentInfo: true });
 

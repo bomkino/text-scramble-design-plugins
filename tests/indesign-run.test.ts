@@ -439,10 +439,9 @@ test("cleanup: links point at example.com, names go neutral, document info clear
   assert.deepEqual(f.document.urlDestinations.map((destination) => destination.name), ["Link 1", "Link 2"]);
   assert.deepEqual(f.document.hyperlinkList.map((link) => link.name), ["Hyperlink 1", "Hyperlink 2"]);
   assert.equal(f.document.pageDestinations[0].name, "Page link 1");
-  for (const key of ["author", "description", "copyrightNotice", "copyrightInfoURL", "jobName"]) {
+  for (const key of ["documentTitle", "author", "description", "copyrightNotice", "copyrightInfoURL", "jobName"]) {
     assert.equal(f.document.metadataPreferences[key], "", key);
   }
-  assert.equal(f.document.metadataPreferences.documentTitle, "Untitled", "InDesign ignores an empty title, so it gets a neutral one");
   assert.deepEqual(f.document.metadataPreferences.keywords, []);
   assert.deepEqual(report.cleanup, { links: 2, renamed: 5, documentInfo: true });
   const everyAddress = f.document.urlDestinations.map((destination) => destination.destinationURL).join(" ");

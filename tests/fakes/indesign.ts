@@ -677,12 +677,22 @@ export class Document {
         get: () => fields[key],
         set: (value) => {
           world.assertInScript("Document info");
-          // Like InDesign, an empty title is quietly ignored.
+          // Like InDesign 2026, an empty title is quietly ignored.
           if (key === "documentTitle" && value === "") return;
           fields[key] = value;
         },
       });
     }
+    // The XMP route does clear the title: setProperty(Dublin Core, "title[1]", "").
+    const xmpFields: Record<string, string> = { "title[1]": "documentTitle", "description[1]": "description", "rights[1]": "copyrightNotice" };
+    Object.defineProperty(this.metadataPreferences, "setProperty", {
+      enumerable: false,
+      value: (namespace: string, path: string, value: string) => {
+        world.assertInScript("Document info");
+        if (namespace !== "http://purl.org/dc/elements/1.1/" || !(path in xmpFields)) throw new Error(`Unknown XMP property ${path}.`);
+        fields[xmpFields[path]] = value;
+      },
+    });
     this.basicParagraph = this.paragraphStyle("[Basic Paragraph]");
     this.defaultLayer = this.layer("Layer 1");
   }

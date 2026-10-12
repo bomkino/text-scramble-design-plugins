@@ -125,8 +125,11 @@ export function inspectScope(host: InDesignHost, options: RunOptions): ScopeSumm
   };
 }
 
+// Keyed by id first: InDesign's specifier depends on how an object was reached.
 function unlockKey(item: any, index: number): string {
-  return read(() => String(item.toSpecifier()), "") || `${constructorName(item)}-${read(() => item.id, index)}`;
+  const id = read(() => item.id, null);
+  if (typeof id === "number") return `${constructorName(item)}#${id}`;
+  return read(() => String(item.toSpecifier()), "") || `${constructorName(item)}-${index}`;
 }
 
 /** Unlocks layers first, then groups and frames. Returns a function that locks them again. */

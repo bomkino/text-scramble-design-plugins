@@ -22,8 +22,9 @@ export interface CleanupReport {
 
 export const EXAMPLE_LINK = "https://example.com/";
 export const EXAMPLE_EMAIL = "mailto:hello@example.com";
-/** What the document title becomes when InDesign won't take an empty one. */
+/** What the document title becomes if InDesign won't clear it at all. */
 export const NEUTRAL_TITLE = "Untitled";
+const DUBLIN_CORE = "http://purl.org/dc/elements/1.1/";
 
 function read<T>(read: () => T, fallback: T): T {
   try {
@@ -102,28 +103,38 @@ export function cleanDocument(document: any): CleanupReport {
     if (rename(destination, `Page link ${index + 1}`, used)) report.renamed++;
   });
 
-  // InDesign quietly ignores an empty value for some fields (the document title, for one), so a field
-  // that still holds text afterwards gets a neutral placeholder instead.
+  // InDesign quietly ignores an empty document title. Clearing its XMP entry directly works, and a field
+  // that still holds text after both gets a neutral placeholder.
   const metadata = read(() => document.metadataPreferences, null);
   if (metadata) {
-    const fields: Array<[string, unknown, string | null]> = [
-      ["documentTitle", "", NEUTRAL_TITLE],
-      ["author", "", "Unknown"],
-      ["description", "", "None"],
-      ["keywords", [], null],
-      ["copyrightNotice", "", "None"],
-      ["copyrightInfoURL", "", EXAMPLE_LINK],
-      ["jobName", "", NEUTRAL_TITLE],
+    const fields: Array<[string, unknown, string | null, string | null]> = [
+      ["documentTitle", "", "title[1]", NEUTRAL_TITLE],
+      ["author", "", null, "Unknown"],
+      ["description", "", "description[1]", "None"],
+      ["keywords", [], null, null],
+      ["copyrightNotice", "", "rights[1]", "None"],
+      ["copyrightInfoURL", "", null, EXAMPLE_LINK],
+      ["jobName", "", null, NEUTRAL_TITLE],
     ];
-    for (const [field, empty, neutral] of fields) {
+    const holdsText = (field: string) => {
+      const value = read(() => metadata[field], "");
+      return typeof value === "string" && value !== "";
+    };
+    for (const [field, empty, xmpPath, neutral] of fields) {
       try {
         try {
           metadata[field] = empty;
         } catch (error) {
           if (neutral === null) throw error;
         }
-        const left = read(() => metadata[field], "");
-        if (neutral !== null && typeof left === "string" && left !== "") metadata[field] = neutral;
+        if (xmpPath && holdsText(field)) {
+          try {
+            metadata.setProperty(DUBLIN_CORE, xmpPath, "");
+          } catch {
+            // Fall back to the neutral value below.
+          }
+        }
+        if (neutral !== null && holdsText(field)) metadata[field] = neutral;
         report.documentInfo = true;
       } catch {
         // Not every InDesign version exposes every field.

@@ -18,6 +18,7 @@
     var EXAMPLE_LINK = "https://example.com/";
     var EXAMPLE_EMAIL = "mailto:hello@example.com";
     var NEUTRAL_TITLE = "Untitled";
+    var DUBLIN_CORE = "http://purl.org/dc/elements/1.1/";
     var TEXT_TYPES = makeSet(["Text", "Character", "Word", "Line", "Paragraph", "TextColumn", "TextStyleRange", "Story"]);
     var CELL_TYPES = makeSet(["Cell", "Table", "Row", "Column"]);
     var FRAME_TYPES = makeSet(["TextFrame", "EndnoteTextFrame"]);
@@ -836,7 +837,7 @@
       var pageDestinations = collectionItems(readProperty(document, "hyperlinkPageDestinations", null));
       var metadata = readProperty(document, "metadataPreferences", null);
       var fields;
-      var left;
+      var field;
       var url;
       var index;
       for (index = 0; index < destinations.length; index += 1) {
@@ -855,22 +856,34 @@
       for (index = 0; index < pageDestinations.length; index += 1) {
         if (renameItem(pageDestinations[index], "Page link " + (index + 1), used)) report.renamed += 1;
       }
-      // InDesign quietly ignores an empty value for some fields (the document title, for one), so a
-      // field that still holds text afterwards gets a neutral placeholder instead.
+      // InDesign quietly ignores an empty document title. Clearing its XMP entry directly works, and
+      // a field that still holds text after both gets a neutral placeholder.
+      function holdsText(name) {
+        var value = readProperty(metadata, name, "");
+        return typeof value === "string" && value !== "";
+      }
       if (metadata) {
         fields = [
-          ["documentTitle", "", NEUTRAL_TITLE], ["author", "", "Unknown"], ["description", "", "None"], ["keywords", [], null],
-          ["copyrightNotice", "", "None"], ["copyrightInfoURL", "", EXAMPLE_LINK], ["jobName", "", NEUTRAL_TITLE]
+          ["documentTitle", "", "title[1]", NEUTRAL_TITLE], ["author", "", null, "Unknown"], ["description", "", "description[1]", "None"],
+          ["keywords", [], null, null], ["copyrightNotice", "", "rights[1]", "None"], ["copyrightInfoURL", "", null, EXAMPLE_LINK],
+          ["jobName", "", null, NEUTRAL_TITLE]
         ];
         for (index = 0; index < fields.length; index += 1) {
+          field = fields[index];
           try {
             try {
-              metadata[fields[index][0]] = fields[index][1];
+              metadata[field[0]] = field[1];
             } catch (error) {
-              if (fields[index][2] === null) throw error;
+              if (field[3] === null) throw error;
             }
-            left = readProperty(metadata, fields[index][0], "");
-            if (fields[index][2] !== null && typeof left === "string" && left !== "") metadata[fields[index][0]] = fields[index][2];
+            if (field[2] !== null && holdsText(field[0])) {
+              try {
+                metadata.setProperty(DUBLIN_CORE, field[2], "");
+              } catch (error) {
+                // Fall back to the neutral value below.
+              }
+            }
+            if (field[3] !== null && holdsText(field[0])) metadata[field[0]] = field[3];
             report.documentInfo = true;
           } catch (error) {
             // Not every InDesign version exposes every field.
@@ -1001,14 +1014,17 @@
       return total === target.offset + toCharacters(target.source).length;
     }
 
+    // Keyed by id first: InDesign's specifier depends on how an object was reached.
     function unlockKey(item, index) {
+      var id = readProperty(item, "id", null);
       var key = "";
+      if (typeof id === "number") return constructorName(item) + "#" + id;
       try {
         key = String(item.toSpecifier());
       } catch (error) {
         key = "";
       }
-      return key || constructorName(item) + "-" + readProperty(item, "id", index);
+      return key || constructorName(item) + "-" + index;
     }
 
     /** Unlocks layers first, then groups and frames. Returns what it unlocked, to lock again later. */
