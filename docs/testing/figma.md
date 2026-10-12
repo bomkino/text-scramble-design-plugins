@@ -8,7 +8,7 @@ Run these in Part 4 of the [Mac brief](README.md), on `main` unless the cloud th
 - Use only the sample text from the brief:
   - Line A: `Brindlewick Studio — Spring Review 2026`
   - Line B: `Quellmoor Orchard will open its café on 14 March, with 3 new rooms.`
-  - Line C: `Amélie and Jonas wrote the brief; Amélie signs it off.`
+  - Line C: `Amélie and Jonas wrote the brief; Amélie signs it off.` The second "Amélie" uses a separate accent mark (U+0301). To keep it, write the line to a file with Node and paste it with `pbcopy < file`, rather than typing it.
 - Fonts: use **Inter** only (Regular, Bold, Italic). Figma always has it.
 - After every run that changes text, press **⌘Z once** and check everything comes back. Write "undo ok" or what stayed changed.
 - Record each check in `RESULTS.md` as pass, fail or blocked, with what you saw. Take a screenshot of anything that fails.

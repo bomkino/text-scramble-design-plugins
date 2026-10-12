@@ -26,10 +26,10 @@ You are a Claude Code session on the user's Mac. Your job is to test the current
 ```text
 Brindlewick Studio — Spring Review 2026
 Quellmoor Orchard will open its café on 14 March, with 3 new rooms.
-Amélie and Jonas wrote the brief; Amélie signs it off.
+Amélie and Jonas wrote the brief; Amélie signs it off.
 ```
 
-Use it everywhere a check needs text. The second "Amélie" is typed with a separate accent mark, so both ways of storing `é` get tested.
+Use it everywhere a check needs text. The second "Amélie" is stored as "e" plus a separate accent mark (U+0301), so both ways of storing `é` get tested. Copying and pasting can merge the two, so put the text into files with Node, as [raycast.md](raycast.md) R1 does, and use `pbcopy` from those files.
 
 ### Part 0: Check the Mac
 

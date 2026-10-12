@@ -28,6 +28,16 @@
   // text of each part so a test can tell what changed.
   function buildTextScrambleFixture() {
     var doc = app.documents.add(true);
+    try {
+      return buildParts(doc);
+    } catch (error) {
+      // Never leave a half-built scratch document open.
+      if (doc.isValid) doc.close(SaveOptions.NO);
+      throw error;
+    }
+  }
+
+  function buildParts(doc) {
     doc.viewPreferences.horizontalMeasurementUnits = MeasurementUnits.MILLIMETERS;
     doc.viewPreferences.verticalMeasurementUnits = MeasurementUnits.MILLIMETERS;
     doc.documentPreferences.facingPages = false;
@@ -41,9 +51,11 @@
     var body = doc.paragraphStyles.add({ name: "TS Body" });
 
     // 1. A threaded article: page 1 -> page 2, then overset text. It holds a table with a nested
-    //    table, a footnote and an anchored frame.
-    var article1 = frame(page1, [20, 20, 70, 110]);
-    var article2 = frame(page2, [20, 20, 45, 110]);
+    //    table, a footnote and an anchored frame. The page 2 frame starts tall, so nothing is in
+    //    overset while the table and the anchored frame are sized (InDesign refuses to size a frame
+    //    that sits in overset text). It shrinks once the story is complete.
+    var article1 = frame(page1, [20, 20, 75, 190]);
+    var article2 = frame(page2, [20, 20, 280, 190]);
     article1.nextTextFrame = article2;
     var story = article1.parentStory;
     story.contents = "Brindlewick Annual Review\rBrindlewick grew in every region, and Quellmoor Orchard opened 3 rooms. ";
@@ -52,10 +64,12 @@
     story.characters.item(2).underline = true;
 
     var table = story.insertionPoints.item(-1).tables.add({ bodyRowCount: 2, columnCount: 2 });
+    table.columns.everyItem().width = 50;
     table.cells.item(0).contents = "Brindlewick ledger";
     table.cells.item(1).contents = "Spring 2026";
     table.cells.item(2).contents = "Quellmoor totals";
     var nested = table.cells.item(3).insertionPoints.item(0).tables.add({ bodyRowCount: 1, columnCount: 1 });
+    nested.columns.everyItem().width = 40;
     nested.cells.item(0).contents = "Brindlewick inner cell";
 
     story.insertionPoints.item(-1).contents = " See the note";
@@ -65,7 +79,8 @@
     var anchored = story.insertionPoints.item(-1).textFrames.add();
     anchored.geometricBounds = [0, 0, 8, 50];
     anchored.contents = "Brindlewick anchored caption";
-    story.insertionPoints.item(-1).contents = "\r" + repeat("The overset tail mentions Brindlewick once more. ", 40);
+    story.insertionPoints.item(-1).contents = "\r" + repeat("The overset tail mentions Brindlewick once more. ", 60);
+    article2.geometricBounds = [20, 20, 50, 190];
 
     // 2. Text on a parent (master) page.
     var parentSpread = doc.masterSpreads.item(0);
@@ -79,7 +94,10 @@
     hidden.visible = false;
 
     // 5. A frame on a locked layer, and a locked frame.
+    // Adding a layer makes it the active one, so switch back: only the slug belongs on it.
+    var baseLayer = doc.activeLayer;
     var lockedLayer = doc.layers.add({ name: "TS Locked furniture" });
+    doc.activeLayer = baseLayer;
     var slug = frame(page2, [60, 20, 70, 110], "Brindlewick slug line", { itemLayer: lockedLayer });
     var lockedFrame = frame(page1, [100, 20, 110, 110], "Brindlewick locked frame");
     lockedFrame.locked = true;
