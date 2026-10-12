@@ -1,52 +1,51 @@
 # Text Scramble for Figma + InDesign
 
-Beautifully invented placeholder copy for decks that need to look finished before the real words can be shown.
+Swap real copy for invented words of the same shape, so a layout can be shown before its words can.
 
-Text Scramble replaces readable copy with pronounceable, shape-matched language while keeping the composition alive: character count, casing, punctuation, whitespace, paragraph breaks, and digit structure stay put. Candidate words are ranked by estimated visual width, so line measure remains close without falling back to lorem ipsum.
+Text Scramble keeps the composition alive: word lengths, capitals, punctuation, spacing, paragraph breaks and how long each number is all stay put. It picks invented words close to the width of the originals, so lines stay close to their length without falling back to lorem ipsum.
 
-The plugins run entirely on device. No text, document data, or analytics leave Figma or InDesign.
+Everything runs on your computer. No text, document data or analytics leave Figma or InDesign.
 
-## What survives
+## Download
 
-- Fonts, sizes, weights, fills, links, and character-level styling
-- Paragraph styles, spacing, tabs, punctuation, and explicit line breaks
-- Repeated-word consistency across the current run
-- Unicode combining marks and decimal digits in their original writing system
-- One clean undo step
+Get the latest files from [Releases](https://github.com/bomkino/text-scramble-design-plugins/releases/latest):
 
-Glyph widths vary by font, so automatic line wraps can move slightly. The engine minimizes that drift; it cannot promise pixel-identical reflow in every typeface.
+| File | For |
+|---|---|
+| `Text-Scramble-Figma-<version>.zip` | The Figma plugin. [How to install it](docs/INSTALL-FIGMA.md) |
+| `Text-Scramble-InDesign-<version>.zip` | The InDesign panel, plus both InDesign scripts. [How to install it](docs/INSTALL-INDESIGN.md) |
+| `Text-Scramble-InDesign-<version>.jsx` | Just the quick InDesign script, the fastest way to start |
+| `SHA256SUMS.txt` | Checksums, to confirm a download arrived intact |
+
+There's also [Text Scramble for Raycast](https://www.raycast.com/kumail_changezi/text-scramble), which scrambles selected text in any Mac app.
+
+## What stays the same
+
+- Fonts, sizes, weights, colours and character styles
+- Paragraph styles, spacing, tabs, punctuation and line breaks
+- Repeated words: the same word becomes the same invented word everywhere in one run
+- Accents, and the kind of digits (Arabic-Indic digits stay Arabic-Indic, for example)
+- Link styling. The web address behind a link stays real; see [Before you share](PRIVACY.md).
+
+Email addresses and web addresses typed as text are scrambled too, and always end in a made-up ending such as `.test` or `.example` that can never belong to a real site.
+
+Fonts vary in width, so automatic line breaks can shift a little. [Formatting](docs/FORMATTING.md) has the details.
 
 ## Use it safely
 
-Text Scramble changes the current selection or page. Duplicate the Figma page or InDesign document first, then run it on the duplicate. If the result is not right, press **Command–Z** once.
+- Work on a copy: duplicate the Figma page or the InDesign document first.
+- One **Undo** (⌘Z) puts the whole run back.
+- Type the same **Seed** to get the same invented words again.
+- Scrambled copy is a disguise for drafts, not redaction. Before a file leaves the studio, go through [Before you share](PRIVACY.md).
 
-## Install
+## More
 
-- [Figma installation](docs/INSTALL-FIGMA.md)
-- [InDesign installation](docs/INSTALL-INDESIGN.md)
-- [Formatting contract](docs/FORMATTING.md)
-- [Publishing notes](docs/PUBLISHING.md)
-
-## Develop
-
-Requires Node.js 20 or newer. Building and packaging work on macOS and Linux. The InDesign PNG icons are committed; after editing `assets/icon.svg`, re-render them on a Mac with `npm run icons`. The plugins themselves run in Figma and InDesign on macOS and Windows.
-
-```bash
-npm install
-npm run verify
-npm run package
-```
-
-`npm run verify` type-checks, runs the deterministic test suite, builds both hosts, and validates the manifests, privacy boundary, formatting paths, UI copy, legacy Unicode indexing, and bundle sizes.
-
-## Project map
-
-```text
-packages/core/       Shared scrambling engine and replacement runs
-plugins/figma/       Figma plugin
-plugins/indesign/    InDesign UXP panel, command, UXP script, and JSX companion
-tests/               Deterministic engine tests
-scripts/             Build, verification, local-install, and release packaging
-```
+- [Install in Figma](docs/INSTALL-FIGMA.md)
+- [Install in InDesign](docs/INSTALL-INDESIGN.md)
+- [Formatting](docs/FORMATTING.md)
+- [Before you share](PRIVACY.md)
+- [Changelog](CHANGELOG.md)
+- [Contributing](CONTRIBUTING.md), for developers
+- [Publishing](docs/PUBLISHING.md), for maintainers
 
 MIT licensed. Made with care by [pitch.dog](https://pitch.dog). See [acknowledgements](ACKNOWLEDGEMENTS.md).

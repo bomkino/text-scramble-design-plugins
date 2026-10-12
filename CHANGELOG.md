@@ -1,12 +1,32 @@
 # Changelog
 
-## 1.0.3 — 2026-10-12
+## 1.1.0 — 2026-10-12
 
-- Fixed the classic InDesign JSX, which ExtendScript refused to load because reserved words (`for`, `in`, `new`) were used as unquoted object keys.
-- Fixed a crash in the classic JSX when copy contained words such as "watch" or "reflect", which collided with members ExtendScript adds to every object.
-- Moved the common-word and unwelcome-fragment lists into `packages/core/src/word-lists.ts`. The build now injects them into the JSX, so every host blocks the same words.
-- Added about 200 everyday words the generator was observed to produce (such as "ten", "rose" and "rude") to the common-word list.
-- Verification now parses the JSX as ES3 and runs its engine in a sandbox that mimics ExtendScript's inherited object members.
+### InDesign
+
+- New **Document** scope: every story, overset text, table (nested ones too), footnote, parent page, text on a path and pasteboard frame, plus bookmarks, text anchors and custom text variables, in one run and one undo.
+- **Include locked items** (on by default) scrambles locked frames and layers, then locks them again. **Include hidden items** (off by default) decides whether hidden items change; skipped items are counted in the report.
+- **Keep readable** leaves chosen paragraph styles alone, and **Always scramble these words** still changes names inside them.
+- **Clean links and document info** (off by default) points links at `example.com` addresses, gives them plain names, and empties the title, author and other document info.
+- A report after each run says what changed, what was skipped and why, and which pages now have overflowing text.
+- The classic script has a proper dialog with the same options, and now runs the same engine as the panel. It loads in InDesign 2026, which refused 1.0.2's script, and no longer stops on words such as "watch".
+
+### Figma
+
+- **Include hidden layers** switch, off by default. Locked layers are now scrambled, because locked text still exports, and the plugin counts them.
+- When an instance and its main component are both scrambled, the instance follows its main component instead of gaining overrides, and the plugin warns when a main component's instances on other pages will change.
+- Text layers whose names repeat their text get the new text as their name.
+- Clearer panel: **This page** (was "Current page"), counts of skipped layers, and a result that stays open when something needs a look.
+
+### Both
+
+- **Seed:** type any word to get the same invented words every time, in Figma, InDesign and the Raycast extension.
+- A word becomes the same invented word everywhere in one run, across every frame, cell and layer.
+- Accents: "é" typed as one character or as "e" plus an accent mark now scramble the same way, and accented letters stay accented.
+- Email and web addresses always end in a made-up ending such as `.test` or `.example` that can never belong to a real site.
+- Many more everyday words are kept out of the invented copy.
+- New [Before you share](https://github.com/bomkino/text-scramble-design-plugins/blob/main/PRIVACY.md) checklist, and shorter install guides written for designers.
+- Building and packaging now work on Linux as well as macOS.
 
 ## 1.0.2 — 2026-08-12
 

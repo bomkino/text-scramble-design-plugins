@@ -2,7 +2,7 @@
   "manifestVersion": 5,
   "id": "dog.pitch.text-scramble.indesign",
   "name": "Text Scramble",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "main": "dist/index.html",
   "host": {
     "app": "ID",
