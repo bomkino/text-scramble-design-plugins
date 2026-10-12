@@ -14,8 +14,8 @@
       "id": "textScramblePanel",
       "label": { "default": "Text Scramble" },
       "minimumSize": { "width": 280, "height": 470 },
-      "preferredDockedSize": { "width": 320, "height": 570 },
-      "preferredFloatingSize": { "width": 360, "height": 590 },
+      "preferredDockedSize": { "width": 320, "height": 780 },
+      "preferredFloatingSize": { "width": 360, "height": 800 },
       "description": { "default": "Replace selected copy with shape-matched invented text" }
     },
     {
