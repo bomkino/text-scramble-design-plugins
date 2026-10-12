@@ -6,7 +6,7 @@ Run these in Parts 2 and 3 of the [Mac brief](README.md), on `main` unless the c
 
 - **Scratch documents only.** Every check starts from a NEW document made by `indesign-fixture.jsx` (or by the harness). Never open a real document. Close scratch documents with **Don't Save**.
 - Invented text only. The fixture uses the brief's names: Brindlewick, Quellmoor.
-- After every run that changes text, press **⌘Z once** (Edit › Undo Text Scramble) and check that everything comes back. Write "undo ok" or what stayed changed.
+- After every run that changes text, press **⌘Z once** (**Edit › Undo Text Scramble**) and check that everything comes back. Write "undo ok" or what stayed changed.
 - Record each check in `RESULTS.md` as pass, fail or blocked, with what you saw. Screenshot anything that fails.
 - Files in this folder:
   - `indesign-fixture.jsx`: builds the scratch document and leaves it open (for the panel checks).
@@ -20,7 +20,7 @@ Run these in Parts 2 and 3 of the [Mac brief](README.md), on `main` unless the c
   done
   ```
 
-  The harness looks for the built script at `../text-scramble-design-plugins/plugins/indesign/dist/Text Scramble.jsx`, relative to itself. If your layout differs, set `$.global.TextScrambleHarness = { script: "/full/path/Text Scramble.jsx" }` first.
+  The harness looks for the built script at `text-scramble-design-plugins/plugins/indesign/dist/Text Scramble.jsx` beside itself (the brief's layout), then at `../../plugins/indesign/dist/Text Scramble.jsx` (when it runs from `docs/testing` in a checkout). If your layout differs, set `$.global.TextScrambleHarness = { script: "/full/path/Text Scramble.jsx" }` first.
 
 ### What the fixture contains
 
@@ -45,9 +45,9 @@ Two pages and a parent page. It holds:
   osascript -e 'tell application id "com.adobe.InDesign" to do script (POSIX file "'"$PWD"'/indesign-harness.bom.jsx") language javascript'
   ```
 
-- **Expect:** it prints "N of N checks passed" and writes `indesign-jsx-results.json`. No scratch document is left open, and no other document changed. Send the whole JSON back to the cloud thread, including the `reports` section, even when everything passes.
+- **Expect:** it prints "N of N checks passed" and writes `indesign-jsx-results.json`. No scratch document is left open, even when a case fails, and no other document changed. Send the whole JSON back to the cloud thread, including the `reports` section, even when everything passes.
 - **What it checks**, in seven fresh documents:
-  1. **Document scope, defaults (seed 1):** every part changes and no "Brindlewick" is left, except the hidden frame (skipped and counted). The locked layer and the locked frame are locked again afterwards. Links and document info are unchanged. Text length is unchanged, the headline keeps its style, and the underline on character 3 stays. There are no errors. The overflow report names page 2. The emoji line is either scrambled or reported as "couldn't be lined up". One Undo restores the story, the parent page, the bookmark and the variable.
+  1. **Document scope, defaults (seed 1):** every part changes and no "Brindlewick" is left, except the hidden frame (skipped and counted). The locked layer and the locked frame are locked again afterwards. Links and document info are unchanged. Text length is unchanged, the headline keeps its style, and its one underlined character stays underlined. There are no errors. The overflow report names page 2. The emoji line is either scrambled or reported as "couldn't be lined up". One Undo restores the story, the parent page, the bookmark and the variable.
   2. **Page scope (page 2):** the page 1 frame is untouched. The page 2 frame and the overset text change, and so do the locked-layer slug and the grouped caption. The parent page and the circle on page 1 are untouched.
   3. **Selection (page 1 article frame):** only that frame changes, not the next frame in the thread or any other frame.
   4. **Include hidden on, include locked off:** the hidden frame changes. Both locked texts stay, and the report counts 2 locked.
@@ -119,7 +119,7 @@ Setup: build a scratch document with `indesign-fixture.bom.jsx`. Ask the person 
 - **Expect:**
   - The button reads **Shaping fresh language…** while it works.
   - The report starts **Done — … characters in …** and mentions the overset text.
-  - It ends with **Edit › Undo Text Scramble puts it all back in one step.**
+  - It ends with **Edit > Undo Text Scramble puts it all back in one step.**
   - In the dump: page 2's frame text and the overset tail are scrambled. Page 1's frame, the parent page and the pasteboard note are unchanged.
   - ⌘Z once restores everything.
 

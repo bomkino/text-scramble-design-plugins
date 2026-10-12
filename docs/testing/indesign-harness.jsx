@@ -14,7 +14,9 @@
 (function () {
   var here = File($.fileName).parent;
   var settings = $.global.TextScrambleHarness || {};
-  var scriptFile = File(settings.script || here.fsName + "/../text-scramble-design-plugins/plugins/indesign/dist/Text Scramble.jsx");
+  // Beside a text-scramble-design-plugins checkout (the Mac brief's layout), or inside its docs/testing.
+  var scriptFile = File(settings.script || here.fsName + "/text-scramble-design-plugins/plugins/indesign/dist/Text Scramble.jsx");
+  if (!settings.script && !scriptFile.exists) scriptFile = File(here.fsName + "/../../plugins/indesign/dist/Text Scramble.jsx");
   var outputFile = File(settings.output || here.fsName + "/indesign-jsx-results.json");
   var results = [];
   var reports = {};
@@ -92,9 +94,21 @@
     return $.global.TextScrambleResult;
   }
 
+  function documentIds() {
+    var ids = {};
+    var index;
+    for (index = 0; index < app.documents.length; index += 1) ids[app.documents.item(index).id] = true;
+    return ids;
+  }
+
   // Builds a fresh fixture, runs `body`, and always closes the scratch document without saving.
+  // Any other document opened during the case is closed too, even when the fixture fails half-way.
+  // Documents that were open before the case are never touched.
   function withFixture(caseName, body) {
     var fixture = null;
+    var before = documentIds();
+    var index;
+    var doc;
     try {
       fixture = $.global.buildTextScrambleFixture();
       if (app.activeDocument !== fixture.doc && app.activeDocument.id !== fixture.doc.id) throw new Error("The scratch document is not the active document.");
@@ -102,8 +116,21 @@
     } catch (error) {
       check(caseName, "ran without an exception", false, error + (error.line ? " (line " + error.line + ")" : ""));
     } finally {
-      if (fixture && fixture.doc && fixture.doc.isValid) fixture.doc.close(SaveOptions.NO);
+      for (index = app.documents.length - 1; index >= 0; index -= 1) {
+        doc = app.documents.item(index);
+        if (!before[doc.id]) doc.close(SaveOptions.NO);
+      }
     }
+  }
+
+  // How many characters in the headline paragraph are underlined. The fixture underlines exactly
+  // one. Counted instead of read by index, because the text anchor adds a hidden marker before it.
+  function underlinedInHeadline(f) {
+    var characters = f.story.paragraphs.item(0).characters;
+    var count = 0;
+    var index;
+    for (index = 0; index < characters.length; index += 1) if (characters.item(index).underline === true) count += 1;
+    return count;
   }
 
   var interaction = app.scriptPreferences.userInteractionLevel;
@@ -133,7 +160,7 @@
       check("1 whole document, defaults", "document info untouched without cleanup", after.author === before.author);
       check("1 whole document, defaults", "same length as before", after.story.length === before.story.length, before.story.length + " -> " + after.story.length);
       check("1 whole document, defaults", "headline style kept", f.story.paragraphs.item(0).appliedParagraphStyle.name === "TS Headline");
-      check("1 whole document, defaults", "underline kept on character 3", f.story.characters.item(2).underline === true);
+      check("1 whole document, defaults", "the one underlined character stays underlined", underlinedInHeadline(f) === 1, underlinedInHeadline(f));
       check("1 whole document, defaults", "no errors", report && report.errors && report.errors.length === 0, report && json(report.errors));
       check("1 whole document, defaults", "overflow report lists the tight frame", report && report.overflow && json(report.overflow).indexOf("page 2") !== -1, report && json(report.overflow));
       check("1 whole document, defaults", "special characters: scrambled or reported as unreadable", after.special !== before.special || (report && report.skipped && report.skipped.unreadable > 0), before.special + " -> " + after.special);
@@ -154,7 +181,8 @@
       reports.page = report;
       check("2 page scope", "page 1 frame untouched", after.frame1 === before.frame1);
       check("2 page scope", "page 2 frame changed", after.frame2 !== before.frame2, after.frame2);
-      check("2 page scope", "overset text changed", report && report.kinds && report.kinds.overset === 1, report && json(report.kinds));
+      check("2 page scope", "overset text changed", after.story.slice(-60) !== before.story.slice(-60), after.story.slice(-60));
+      check("2 page scope", "report counts overset text", report && report.kinds && report.kinds.overset >= 1, report && json(report.kinds));
       check("2 page scope", "slug on locked layer changed", after.slug !== before.slug);
       check("2 page scope", "grouped caption changed", after.grouped !== before.grouped);
       check("2 page scope", "parent page untouched", after.footer === before.footer);

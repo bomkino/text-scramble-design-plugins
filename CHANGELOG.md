@@ -24,6 +24,7 @@
 - A word becomes the same invented word everywhere in one run, across every frame, cell and layer.
 - Accents: "é" typed as one character or as "e" plus an accent mark now scramble the same way, and accented letters stay accented.
 - Email and web addresses always end in a made-up ending such as `.test` or `.example` that can never belong to a real site.
+- A sentence missing a space after its full stop ("the end.Next week") is no longer mistaken for a web address, so words like "Test" or "Alt" no longer turn up in scrambled copy.
 - Many more everyday words are kept out of the invented copy.
 - New [Before you share](https://github.com/bomkino/text-scramble-design-plugins/blob/main/PRIVACY.md) checklist, and shorter install guides written for designers.
 - Building and packaging now work on Linux as well as macOS.
