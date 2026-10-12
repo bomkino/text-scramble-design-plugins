@@ -1,5 +1,29 @@
 # Publishing
 
+Text Scramble ships in three places: GitHub releases (downloads anyone can install by hand), Figma Community and the Adobe Marketplace.
+
+As of October 2026 it's on GitHub releases only. Figma Community status is unconfirmed, and there is no Adobe Marketplace listing yet.
+
+## GitHub release
+
+1. Set the new version and rebuild, so the built files carry it:
+
+   ```bash
+   npm version 1.1.0 --no-git-tag-version
+   ```
+
+   Then set the same `"version"` in `plugins/indesign/manifest.json` and run `npm run verify`. It fails if the two numbers differ.
+2. Add an entry to the top of `CHANGELOG.md` headed `## 1.1.0 — <date>`. It becomes the release notes.
+3. Merge to `main`.
+4. On GitHub, open **Actions › Release › Run workflow**. Leave **Dry run** ticked and run it. When it's green, its summary lists the files, their checksums and the release notes.
+5. Run it again on `main` with **Dry run** unticked. It tags the version (for example `v1.1.0`) and publishes the release with:
+   - `Text-Scramble-Figma-<version>.zip`
+   - `Text-Scramble-InDesign-<version>.zip`
+   - `Text-Scramble-InDesign-<version>.jsx`
+   - `SHA256SUMS.txt`, the checksums people can use to confirm a download is intact
+
+The workflow refuses to publish a version that already has a release.
+
 ## Figma Community
 
 Before submission:

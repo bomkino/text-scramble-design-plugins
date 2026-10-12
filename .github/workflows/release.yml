@@ -1,0 +1,97 @@
+name: Release
+
+# Run by hand from the Actions tab: Release › Run workflow.
+# A dry run builds, checks and lists the files, and publishes nothing.
+# Untick "Dry run" on main to tag the version in package.json and publish the GitHub release.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run: build and check only, publish nothing"
+        type: boolean
+        default: true
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PUBLISH: ${{ github.event_name == 'workflow_dispatch' && !inputs.dry_run }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify and package plugins
+        run: npm run package
+
+      - name: Check the version and write the release notes
+        id: meta
+        run: |
+          version="$(node -p 'require("./package.json").version')"
+          awk -v heading="## $version " 'index($0, heading) == 1 { found = 1; next } found && /^## / { exit } found' CHANGELOG.md > "$RUNNER_TEMP/release-notes.md"
+          if ! grep -q '[^[:space:]]' "$RUNNER_TEMP/release-notes.md"; then
+            echo "::error::CHANGELOG.md has no entry for $version."
+            exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/v$version" > /dev/null; then
+            if [ "$PUBLISH" = "true" ]; then
+              echo "::error::v$version is already released. Bump the version first."
+              exit 1
+            fi
+            echo "::warning::v$version is already released."
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Publish the GitHub release
+        if: env.PUBLISH == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::Publish from main only."
+            exit 1
+          fi
+          gh release create "v$VERSION" \
+            "artifacts/Text-Scramble-Figma-$VERSION.zip" \
+            "artifacts/Text-Scramble-InDesign-$VERSION.zip" \
+            "artifacts/Text-Scramble-InDesign-$VERSION.jsx" \
+            artifacts/SHA256SUMS.txt \
+            --target "$GITHUB_SHA" \
+            --title "Text Scramble Design Plugins v$VERSION" \
+            --notes-file "$RUNNER_TEMP/release-notes.md"
+
+      - name: Summary
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          {
+            echo "## Text Scramble Design Plugins v$VERSION"
+            if [ "$PUBLISH" = "true" ]; then echo "Published as a GitHub release."; else echo "Dry run: nothing was published."; fi
+            echo
+            echo '```text'
+            cat artifacts/SHA256SUMS.txt
+            echo '```'
+            echo
+            echo "### Release notes"
+            cat "$RUNNER_TEMP/release-notes.md"
+          } >> "$GITHUB_STEP_SUMMARY"
