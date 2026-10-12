@@ -1,193 +1,167 @@
-import { buildReplacementRuns } from "../../../packages/core/src/replacement-runs";
-import { hasScramblableText, scrambleTexts } from "../../../packages/core/src/scramble-text";
+import { DEFAULT_PREFERENCES, errorView, readPreferences, resultView, scanErrorView, summaryView, type Preferences } from "./copy";
+import { debounce } from "./debounce";
+import { scrambleLayers, type RunOptions } from "./run";
+import { scanScope, type ScanResult, type TextLayer } from "./scope";
 
-type Scope = "selection" | "page";
-
-interface Preferences {
-  scope: Scope;
-  scrambleNumbers: boolean;
-}
-
-interface ScopeSummary {
-  layers: number;
-  characters: number;
-  skippedLocked: number;
-  skippedMissingFonts: number;
-}
-
-const DEFAULT_PREFERENCES: Preferences = { scope: "selection", scrambleNumbers: true };
 const STORAGE_KEY = "text-scramble-preferences-v1";
-let preferences = DEFAULT_PREFERENCES;
+const WIDTH = 372;
+const MIN_HEIGHT = 420;
+const MAX_HEIGHT = 760;
+
+let preferences: Preferences = DEFAULT_PREFERENCES;
 let isScrambling = false;
-let scopeSummaryRequest = 0;
+let isClosing = false;
+let scanRequest = 0;
+let wrappedLayers: TextLayer[] = [];
 
-figma.showUI(__html__, {
-  width: 372,
-  height: 590,
-  title: "Text Scramble",
-  themeColors: true,
-});
+figma.showUI(__html__, { width: WIDTH, height: 600, title: "Text Scramble", themeColors: true });
 
-function isEditable(node: TextNode): boolean {
-  let current: BaseNode | null = node;
-  while (current && current.type !== "DOCUMENT") {
-    if ("visible" in current && current.visible === false) return false;
-    if ("locked" in current && current.locked === true) return false;
-    current = current.parent;
-  }
-  return true;
-}
-
-function textDescendants(node: SceneNode): TextNode[] {
-  if (node.type === "TEXT") return [node];
-  if ("findAllWithCriteria" in node) {
-    return node.findAllWithCriteria({ types: ["TEXT"] });
-  }
-  return [];
-}
-
-async function collectTextNodes(scope: Scope): Promise<TextNode[]> {
+async function scanCurrentScope(): Promise<ScanResult> {
   await figma.currentPage.loadAsync();
-  const candidates =
-    scope === "page"
-      ? figma.currentPage.findAllWithCriteria({ types: ["TEXT"] })
-      : figma.currentPage.selection.flatMap(textDescendants);
-  const unique = new Map<string, TextNode>();
-  candidates.forEach((node) => unique.set(node.id, node));
-  return Array.from(unique.values());
+  // Figma reads hidden layers inside instances slowly. Skip them unless they are wanted.
+  figma.skipInvisibleInstanceChildren = !preferences.includeHidden;
+  const roots = preferences.scope === "page" ? [figma.currentPage] : figma.currentPage.selection;
+  return scanScope(preferences.scope, roots, preferences);
 }
 
-async function inspectScope(scope: Scope): Promise<ScopeSummary> {
-  const nodes = await collectTextNodes(scope);
-  const editable = nodes.filter(isEditable);
-  const eligible = editable.filter(
-    (node) => !node.hasMissingFont && hasScramblableText(node.characters, { scrambleNumbers: preferences.scrambleNumbers }),
-  );
+function postPage(): void {
+  figma.ui.postMessage({ type: "page", name: figma.currentPage.name });
+}
+
+async function sendSummary(): Promise<void> {
+  const request = ++scanRequest;
+  try {
+    const view = summaryView(await scanCurrentScope());
+    if (request === scanRequest) figma.ui.postMessage({ type: "summary", view });
+  } catch (error) {
+    if (request === scanRequest) figma.ui.postMessage({ type: "summary", view: scanErrorView(describeError(error)) });
+  }
+}
+
+const refreshSoon = debounce(() => void sendSummary(), 120);
+
+function describeError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function runOptions(): RunOptions {
   return {
-    layers: eligible.length,
-    characters: eligible.reduce((total, node) => total + Array.from(node.characters).length, 0),
-    skippedLocked: nodes.length - editable.length,
-    skippedMissingFonts: editable.filter((node) => node.hasMissingFont).length,
+    scrambleNumbers: preferences.scrambleNumbers,
+    seed: preferences.seed,
+    loadFont: (font) => figma.loadFontAsync(font),
   };
 }
 
-async function sendScopeSummary(): Promise<void> {
-  const request = ++scopeSummaryRequest;
-  try {
-    const summary = await inspectScope(preferences.scope);
-    if (request === scopeSummaryRequest) figma.ui.postMessage({ type: "scope-summary", summary });
-  } catch (error) {
-    if (request === scopeSummaryRequest) {
-      figma.ui.postMessage({ type: "scope-error", message: error instanceof Error ? error.message : String(error) });
-    }
-  }
-}
-
-async function loadFonts(node: TextNode): Promise<void> {
-  const fonts = node.getRangeAllFontNames(0, node.characters.length);
-  const unique = new Map(fonts.map((font) => [`${font.family}\u0000${font.style}`, font]));
-  await Promise.all(Array.from(unique.values(), (font) => figma.loadFontAsync(font)));
-}
-
-function replaceCharactersPreservingStyles(node: TextNode, output: string): number {
-  const runs = buildReplacementRuns(node.characters, output);
-  for (let index = runs.length - 1; index >= 0; index--) {
-    const run = runs[index];
-    node.insertCharacters(run.start, run.replacement, "AFTER");
-    node.deleteCharacters(run.start + run.replacement.length, run.end + run.replacement.length);
-  }
-  return runs.length;
-}
-
 async function scramble(): Promise<void> {
-  if (isScrambling) return;
+  if (isScrambling || isClosing) return;
   isScrambling = true;
+  refreshSoon.cancel();
+  wrappedLayers = [];
   figma.ui.postMessage({ type: "working" });
 
   try {
+    const scan = await scanCurrentScope();
+    if (scan.eligible.length === 0) {
+      const view = summaryView(scan);
+      figma.notify(view.headline, { error: true });
+      figma.ui.postMessage({ type: "summary", view });
+      figma.ui.postMessage({ type: "idle" });
+      return;
+    }
+
     const selectionBefore = [...figma.currentPage.selection];
-    const candidates = await collectTextNodes(preferences.scope);
-    const nodes = candidates.filter(
-      (node) =>
-        isEditable(node) &&
-        !node.hasMissingFont &&
-        hasScramblableText(node.characters, { scrambleNumbers: preferences.scrambleNumbers }),
-    );
+    const report = await scrambleLayers(scan.eligible, runOptions());
+    const view = resultView(report, scan);
 
-    if (nodes.length === 0) {
-      const message = preferences.scope === "selection" ? "Select text or a frame containing text." : "No editable text on this page.";
-      figma.notify(message, { error: true });
-      figma.ui.postMessage({ type: "empty", message });
-      return;
+    if (report.layers > 0) {
+      // Clearing and restoring the selection makes Figma refresh its properties panel.
+      figma.currentPage.selection = [];
+      figma.currentPage.selection = selectionBefore;
+      figma.commitUndo();
     }
 
-    const outputs = scrambleTexts(
-      nodes.map((node) => node.characters),
-      { scrambleNumbers: preferences.scrambleNumbers },
-    );
-    let layers = 0;
-    let characters = 0;
-    const failed: string[] = [];
-
-    for (let index = 0; index < nodes.length; index++) {
-      const node = nodes[index];
-      try {
-        await loadFonts(node);
-        replaceCharactersPreservingStyles(node, outputs[index]);
-        layers++;
-        characters += Array.from(node.characters).length;
-      } catch (error) {
-        failed.push(`${node.name}: ${error instanceof Error ? error.message : String(error)}`);
-      }
+    wrappedLayers = report.wrapped;
+    figma.notify(view.toast, { error: report.layers === 0 });
+    figma.ui.postMessage({ type: "result", view });
+    if (view.closeAutomatically) {
+      isClosing = true;
+      refreshSoon.cancel();
+      setTimeout(() => figma.closePlugin(), 1100);
     }
-
-    if (layers === 0) {
-      const message = failed[0] ?? "Nothing could be scrambled.";
-      figma.notify(message, { error: true });
-      figma.ui.postMessage({ type: "failed", message, failed });
-      return;
-    }
-
-    figma.currentPage.selection = [];
-    figma.currentPage.selection = selectionBefore;
-    figma.commitUndo();
-    const skipped = candidates.length - layers;
-    figma.notify(`Scrambled ${layers} text ${layers === 1 ? "layer" : "layers"}${skipped ? ` · ${skipped} skipped` : ""}`);
-    figma.ui.postMessage({ type: "complete", layers, characters, skipped, failed });
-    setTimeout(() => figma.closePlugin(), 900);
   } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
-    const message = "Couldn’t scramble this selection.";
-    figma.notify(message, { error: true });
-    figma.ui.postMessage({ type: "failed", message, failed: [detail] });
+    const view = errorView(describeError(error));
+    figma.notify(view.headline, { error: true });
+    figma.ui.postMessage({ type: "result", view: { ...view, problems: [], canSelectWrapped: false, closeAutomatically: false } });
   } finally {
     isScrambling = false;
+    // Scope changes and page switches made during the run were not scanned, so catch up now.
+    if (!isClosing) refreshSoon();
   }
 }
 
-figma.ui.onmessage = async (message: { type: string; scope?: Scope; scrambleNumbers?: boolean }) => {
-  if (message.type === "ready") {
-    preferences = { ...DEFAULT_PREFERENCES, ...(await figma.clientStorage.getAsync(STORAGE_KEY)) };
-    figma.ui.postMessage({ type: "preferences", preferences });
-    await sendScopeSummary();
-    return;
+function selectWrapped(): void {
+  const layers = wrappedLayers.filter((layer) => !("removed" in layer && layer.removed));
+  if (layers.length === 0) return;
+  try {
+    figma.currentPage.selection = layers as unknown as SceneNode[];
+    figma.viewport.scrollAndZoomIntoView(layers as unknown as SceneNode[]);
+  } catch (error) {
+    figma.notify(`Couldn’t select those layers: ${describeError(error)}`, { error: true });
   }
+}
 
-  if (message.type === "preferences") {
-    preferences = {
-      scope: message.scope === "page" ? "page" : "selection",
-      scrambleNumbers: message.scrambleNumbers !== false,
-    };
-    await figma.clientStorage.setAsync(STORAGE_KEY, preferences);
-    await sendScopeSummary();
-    return;
-  }
+type UiMessage =
+  | { type: "ready" }
+  | { type: "preferences"; preferences: unknown }
+  | { type: "scramble" }
+  | { type: "select-wrapped" }
+  | { type: "resize"; height: number }
+  | { type: "close" };
 
-  if (message.type === "scramble") {
-    await scramble();
+figma.ui.onmessage = async (message: UiMessage) => {
+  switch (message.type) {
+    case "ready": {
+      preferences = readPreferences(await figma.clientStorage.getAsync(STORAGE_KEY));
+      figma.ui.postMessage({ type: "preferences", preferences });
+      postPage();
+      await sendSummary();
+      return;
+    }
+    case "preferences": {
+      const next = readPreferences(message.preferences);
+      const rescan =
+        next.scope !== preferences.scope ||
+        next.scrambleNumbers !== preferences.scrambleNumbers ||
+        next.includeHidden !== preferences.includeHidden;
+      preferences = next;
+      await figma.clientStorage.setAsync(STORAGE_KEY, preferences);
+      if (rescan && !isScrambling && !isClosing) await sendSummary();
+      return;
+    }
+    case "scramble":
+      await scramble();
+      return;
+    case "select-wrapped":
+      selectWrapped();
+      return;
+    case "resize": {
+      const height = Math.round(Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, Number(message.height) || 0)));
+      figma.ui.resize(WIDTH, height);
+      return;
+    }
+    case "close":
+      figma.closePlugin();
+      return;
   }
 };
 
 figma.on("selectionchange", () => {
-  if (!isScrambling && preferences.scope === "selection") void sendScopeSummary();
+  if (!isScrambling && !isClosing && preferences.scope === "selection") refreshSoon();
+});
+
+figma.on("currentpagechange", () => {
+  // The wrapped layers belong to the page the run was on.
+  wrappedLayers = [];
+  postPage();
+  if (!isScrambling && !isClosing) refreshSoon();
 });
