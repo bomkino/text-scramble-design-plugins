@@ -31,6 +31,9 @@ const cases = [
   { inputs: ["Watch the reflect toSource unwatch constructor valueOf __proto__ hasOwnProperty prototype"], seed: "es3" },
   { inputs: ["Sloane met Ruby in Lisbon.", "RUBY and SLOANE, 2026", "", "  — ✦\n\t…  "], seed: "deck" },
   { inputs: ["A quiet title\n\nDesign\twith soul — always.\nhello@example.com · 2026 ✦"], seed: 0 },
+  { inputs: ["Write to hello@quellmoor.co or visit https://www.quellmoor.co/work/autumn-menu?ref=deck."], seed: "web" },
+  { inputs: ["north-star.studio · NORTH-STAR.STUDIO · mail.north-star.co.uk · Ada.Quell@orchard.photography"], seed: 11 },
+  { inputs: ["mailto:team@example.com · demo.example.org · shop.local · Zoë@café.fr · e.g. 3.14 Next.js"], seed: 12 },
 ];
 
 const vectors = cases.map(({ inputs, seed, scrambleNumbers }) => {
