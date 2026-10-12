@@ -14,7 +14,7 @@ async function clean(directory) {
   await mkdir(directory, { recursive: true });
 }
 
-// The classic JSX runs in ExtendScript (ES3), so it cannot import the core. Its @engine block gets the ES3
+// The classic JSX runs in ExtendScript (ES3), so it cannot import the core. Its engine block gets the ES3
 // port of the core instead (packages/core/es3, assembled by scripts/legacy-engine.mjs), with the shared word
 // lists and endings injected, so the JSX scrambles exactly as the Figma and UXP builds do.
 async function importBundled(entry) {
@@ -31,8 +31,8 @@ async function buildLegacyScript() {
     topLevelDomains: TOP_LEVEL_DOMAINS,
   });
   const script = await readFile(path.join(indesign, "src", "Text Scramble.jsx"), "utf8");
-  const placeholder = /^( *)\/\/ @build:engine\n/m;
-  if (!placeholder.test(script)) throw new Error("Text Scramble.jsx is missing the // @build:engine line.");
+  const placeholder = /^( *)\/\/ \[build:engine\]\n/m;
+  if (!placeholder.test(script)) throw new Error("Text Scramble.jsx is missing the // [build:engine] line.");
   return script.replace(placeholder, (_, indent) =>
     engine
       .split("\n")

@@ -16,6 +16,7 @@ export interface HeadlessRunOptions {
 export function createExtendScriptContext(globals?: Record<string, unknown>): Context;
 export function toContextValue(context: Context, value: unknown): any;
 export function fromContextValue<T = any>(value: unknown): T;
+export function directiveCommentLines(source: string): number[];
 export function stripDirectives(source: string): string;
 export function extractSections(source: string, required?: readonly string[]): Record<string, string>;
 export function runJsx(source: string, globals?: Record<string, unknown>, filename?: string): Context;

@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import vm from "node:vm";
 import { parse } from "acorn";
 import { build } from "esbuild";
-import { createExtendScriptContext, es3Problems, runJsxHeadless } from "./extendscript-sandbox.mjs";
+import { createExtendScriptContext, directiveCommentLines, es3Problems, runJsxHeadless } from "./extendscript-sandbox.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const figma = path.join(root, "plugins", "figma");
@@ -60,9 +60,12 @@ assert.match(indesignLegacy, /function hasScramblableText/);
 // as ES3 and run its engine in a sandbox that behaves the same way (scripts/extendscript-sandbox.mjs).
 const legacySource = indesignLegacy.replace(/^#target .*$/m, "");
 const legacyProgram = parse(legacySource, { ecmaVersion: 3, allowReserved: "never" });
-const engineMatch = legacySource.match(/\/\/ @engine:start\n([\s\S]*?)\/\/ @engine:end/);
-assert.ok(engineMatch, "Text Scramble.jsx must keep its @engine:start and @engine:end markers.");
-assert.match(legacySource, /\/\/ @engine:end\n[\s\S]*\/\/ @document:start\n[\s\S]*?\/\/ @document:end/, "Text Scramble.jsx must keep its document-walking code between @document:start and @document:end, after the engine.");
+// ExtendScript reads a line comment that starts with @ as a preprocessor directive and stops the whole
+// script with "Syntax error" on one it doesn't know, so no line of the built script may start that way.
+assert.deepEqual(directiveCommentLines(indesignLegacy), [], 'Text Scramble.jsx has lines starting with "// @", which ExtendScript reads as unknown directives.');
+const engineMatch = legacySource.match(/\/\/ \[engine:start\]\n([\s\S]*?)\/\/ \[engine:end\]/);
+assert.ok(engineMatch, "Text Scramble.jsx must keep its [engine:start] and [engine:end] markers.");
+assert.match(legacySource, /\/\/ \[engine:end\]\n[\s\S]*\/\/ \[document:start\]\n[\s\S]*?\/\/ \[document:end\]/, "Text Scramble.jsx must keep its document-walking code between [document:start] and [document:end], after the engine.");
 assert.ok(/^[\t\n\r\x20-\x7e]*$/.test(engineMatch[1]), "The JSX engine block must be ASCII.");
 
 // The engine shares the script's function scope with the document code and the dialog, so no name may be
@@ -145,7 +148,7 @@ for (let trial = 0; trial < 150; trial++) {
 // The document code outside the engine must not call ES5 methods either, even on arrays that come
 // from InDesign (which the sandbox cannot strip), and must stay ASCII so any encoding reads it.
 assert.deepEqual(es3Problems(indesignLegacy, { skipSections: ["engine"], strictIndexOf: true }), [], "Text Scramble.jsx uses ES5 outside its engine.");
-assert.doesNotMatch(legacySource.slice(legacySource.indexOf("// @engine:end")), /[^\x00-\x7F]/, "Text Scramble.jsx must stay ASCII outside its engine.");
+assert.doesNotMatch(legacySource.slice(legacySource.indexOf("// [engine:end]")), /[^\x00-\x7F]/, "Text Scramble.jsx must stay ASCII outside its engine.");
 
 // Smoke-run the built JSX headlessly against a small fake document: the text changes, in one undo
 // step, and the report has the panel's shape.

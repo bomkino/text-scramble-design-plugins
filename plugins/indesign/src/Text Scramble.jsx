@@ -2,9 +2,9 @@
 
 /* Text Scramble for the classic InDesign Scripts panel · MIT · pitch.dog */
 (function () {
-  // @engine:start
-  // @build:engine
-  // @engine:end
+  // [engine:start]
+  // [build:engine]
+  // [engine:end]
 
   // Document walking and in-place replacement. Kept apart from the engine so the algorithm can change
   // without touching how the script finds and edits InDesign text.
@@ -12,11 +12,13 @@
   // This block mirrors the UXP panel step for step (plugins/indesign/src/collect.ts, keep-readable.ts,
   // cleanup.ts, overflow.ts and run.ts), so both give the same report for the same document. It is
   // ES3 for ExtendScript, and it lives in one closure so none of its names can clash with the engine.
-  // @document:start
+  // [document:start]
   var documentTools = (function () {
     var UNDO_NAME = "Text Scramble";
     var EXAMPLE_LINK = "https://example.com/";
     var EXAMPLE_EMAIL = "mailto:hello@example.com";
+    var NEUTRAL_TITLE = "Untitled";
+    var DUBLIN_CORE = "http://purl.org/dc/elements/1.1/";
     var TEXT_TYPES = makeSet(["Text", "Character", "Word", "Line", "Paragraph", "TextColumn", "TextStyleRange", "Story"]);
     var CELL_TYPES = makeSet(["Cell", "Table", "Row", "Column"]);
     var FRAME_TYPES = makeSet(["TextFrame", "EndnoteTextFrame"]);
@@ -195,6 +197,19 @@
       return value || fallback;
     }
 
+    var ID_KEYED = makeSet(["TextFrame", "EndnoteTextFrame", "TextPath", "Story"]);
+
+    /**
+     * A key that names the same object however it was reached. InDesign's specifier depends on the
+     * path: document.stories.item(0) is "story[0]" but a frame's parentStory is "story[@id=233]".
+     * Stories, frames and text paths have an id that is unique in the document, so they are keyed by it.
+     */
+    function identity(item, fallback) {
+      var type = constructorName(item);
+      var id = readProperty(item, "id", null);
+      return setHas(ID_KEYED, type) && typeof id === "number" ? type + "#" + id : specifier(item, fallback);
+    }
+
     function textContents(text) {
       var contents = readProperty(text, "contents", null);
       return typeof contents === "string" ? contents : null;
@@ -224,8 +239,14 @@
     }
 
     // InDesign enumerations can come back as objects that only compare equal with ==.
+    // ExtendScript enum values are numbers, but UXP hands out a new object for every read, so compare
+    // by name as the panel does.
     function sameEnum(left, right) {
-      return left == right;
+      var name;
+      if (left === right) return true;
+      if (left === null || left === undefined || right === null || right === undefined) return false;
+      name = String(left);
+      return name === String(right) && !/^\[object/.test(name);
     }
 
     function customTextType() {
@@ -341,7 +362,7 @@
       }
 
       function countSkip(container, reason) {
-        var key = specifier(container, "container-" + seenContainers.size);
+        var key = identity(container, "container-" + seenContainers.size);
         if (!setAdd(seenContainers, key)) return;
         skipped[reason] += 1;
       }
@@ -349,13 +370,13 @@
       function rememberStory(story) {
         var key;
         if (!isValid(story)) return;
-        key = specifier(story, "story-" + seenStories.size);
+        key = identity(story, "story-" + seenStories.size);
         if (!setAdd(seenStories, key)) return;
         stories.push(story);
       }
 
       function addTarget(text, offset, source, kind, unlock, onParentPage) {
-        var key = specifier(text, "text-" + seenTargets.size) + "@" + offset;
+        var key = identity(text, "text-" + seenTargets.size) + "@" + offset;
         if (!setAdd(seenTargets, key)) return;
         targets.push({ text: text, offset: offset, source: source, kind: kind, key: key, onParentPage: onParentPage, unlock: unlock });
       }
@@ -402,7 +423,7 @@
         var onParentPage;
         var text;
         if (!isValid(container)) return;
-        key = specifier(container, "container-" + seenContainers.size);
+        key = identity(container, "container-" + seenContainers.size);
         if (setHas(seenContainers, key)) return;
         decision = eligibility(container);
         if (decision.skip) {
@@ -543,7 +564,7 @@
         var containerKey;
         var index;
         if (!isValid(story)) return;
-        if (setHas(seenStories, specifier(story, "story-" + seenStories.size))) return;
+        if (setHas(seenStories, identity(story, "story-" + seenStories.size))) return;
         storyContainers = collectionItems(readProperty(story, "textContainers", null));
         if (!storyContainers.length) {
           rememberStory(story);
@@ -570,7 +591,7 @@
         rememberStory(story);
         for (index = 0; index < eligible.length; index += 1) {
           container = eligible[index].container;
-          containerKey = specifier(container, "container-" + seenContainers.size);
+          containerKey = identity(container, "container-" + seenContainers.size);
           if (setAdd(seenContainers, containerKey)) containers.push(container);
           unlock = unlock.concat(eligible[index].eligibility.unlock);
         }
@@ -822,6 +843,7 @@
       var pageDestinations = collectionItems(readProperty(document, "hyperlinkPageDestinations", null));
       var metadata = readProperty(document, "metadataPreferences", null);
       var fields;
+      var field;
       var url;
       var index;
       for (index = 0; index < destinations.length; index += 1) {
@@ -840,11 +862,34 @@
       for (index = 0; index < pageDestinations.length; index += 1) {
         if (renameItem(pageDestinations[index], "Page link " + (index + 1), used)) report.renamed += 1;
       }
+      // InDesign quietly ignores an empty document title. Clearing its XMP entry directly works, and
+      // a field that still holds text after both gets a neutral placeholder.
+      function holdsText(name) {
+        var value = readProperty(metadata, name, "");
+        return typeof value === "string" && value !== "";
+      }
       if (metadata) {
-        fields = [["documentTitle", ""], ["author", ""], ["description", ""], ["keywords", []], ["copyrightNotice", ""], ["copyrightInfoURL", ""], ["jobName", ""]];
+        fields = [
+          ["documentTitle", "", "title[1]", NEUTRAL_TITLE], ["author", "", null, "Unknown"], ["description", "", "description[1]", "None"],
+          ["keywords", [], null, null], ["copyrightNotice", "", "rights[1]", "None"], ["copyrightInfoURL", "", null, EXAMPLE_LINK],
+          ["jobName", "", null, NEUTRAL_TITLE]
+        ];
         for (index = 0; index < fields.length; index += 1) {
+          field = fields[index];
           try {
-            metadata[fields[index][0]] = fields[index][1];
+            try {
+              metadata[field[0]] = field[1];
+            } catch (error) {
+              if (field[3] === null) throw error;
+            }
+            if (field[2] !== null && holdsText(field[0])) {
+              try {
+                metadata.setProperty(DUBLIN_CORE, field[2], "");
+              } catch (error) {
+                // Fall back to the neutral value below.
+              }
+            }
+            if (field[3] !== null && holdsText(field[0])) metadata[field[0]] = field[3];
             report.documentInfo = true;
           } catch (error) {
             // Not every InDesign version exposes every field.
@@ -975,14 +1020,17 @@
       return total === target.offset + toCharacters(target.source).length;
     }
 
+    // Keyed by id first: InDesign's specifier depends on how an object was reached.
     function unlockKey(item, index) {
+      var id = readProperty(item, "id", null);
       var key = "";
+      if (typeof id === "number") return constructorName(item) + "#" + id;
       try {
         key = String(item.toSpecifier());
       } catch (error) {
         key = "";
       }
-      return key || constructorName(item) + "-" + readProperty(item, "id", index);
+      return key || constructorName(item) + "-" + index;
     }
 
     /** Unlocks layers first, then groups and frames. Returns what it unlocked, to lock again later. */
@@ -1259,10 +1307,10 @@
     return documentTools.run(settings);
   }
 
-  // @document:end
+  // [document:end]
 
   // The dialog and the closing message. Plain ScriptUI, so it looks the same on Mac and Windows.
-  // @ui:start
+  // [ui:start]
   var dialogTools = (function () {
     var SCOPE_VALUES = ["selection", "page", "document"];
     var SCOPE_LABELS = ["Selection", "Active page", "Whole document"];
@@ -1473,7 +1521,7 @@
 
     return { askSettings: askSettings, summaryMessage: summaryMessage, parseWordList: parseWordList, summarizePlaces: summarizePlaces };
   }());
-  // @ui:end
+  // [ui:end]
 
   // A test harness sets $.global.TextScrambleTest to a settings object: the script then skips the
   // dialog and every alert, runs, and leaves a plain copy of the report in $.global.TextScrambleResult.

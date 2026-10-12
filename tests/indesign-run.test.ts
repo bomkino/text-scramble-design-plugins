@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { looksLikeAddress } from "../plugins/indesign/src/cleanup";
+import { looksLikeAddress, sameEnum } from "../plugins/indesign/src/cleanup";
 import { keepPlan, parseWordList } from "../plugins/indesign/src/keep-readable";
 import { inspectScope, paragraphStyleNames, revealItem, runScramble, type RunOptions } from "../plugins/indesign/src/run";
 import { estimateVisualWidth } from "../packages/core/src/scramble-text";
@@ -241,6 +241,22 @@ test("document: reaches every story, table, footnote, path and parent page", () 
   assert.equal(f.app.doScriptCalls.length, 1);
 });
 
+test("document: each story is scrambled and counted once, however InDesign names it", () => {
+  const { app, document } = createInDesign();
+  const [page1, page2] = document.spread(["1", "2"]).pages;
+  const article = document.story("Brindlewick grew in every region and kept going past the frame.");
+  const first = document.frame(page1, article, { capacity: 20 });
+  document.frame(page2, article);
+  document.frame(page1, document.story("Quellmoor Orchard opened three rooms."));
+  // document.stories names each story by index, its frames' parentStory by id: still two stories.
+  assert.notEqual(document.stories.item(0)!.toSpecifier(), first.parentStory.toSpecifier());
+  assert.equal(inspectScope(hostFor(app), { scope: "document" }).targets, 2);
+  const report = run(app, { scope: "document", seed: 22 });
+  assert.equal(report.changed, 2);
+  assert.equal(report.kinds.story, 2);
+  assert.equal(report.characters, Array.from(article.contents).length + "Quellmoor Orchard opened three rooms.".length);
+});
+
 test("document: locked layers and frames are unlocked for the edit and locked again", () => {
   const f = deck();
   run(f.app, { scope: "document", seed: 6 });
@@ -432,6 +448,23 @@ test("cleanup: links point at example.com, names go neutral, document info clear
   assert.ok(!/brindlewick/i.test(everyAddress));
 });
 
+test("cleanup: a title InDesign refuses to empty gets a neutral one", () => {
+  const f = deck();
+  let title = "Brindlewick deck";
+  Object.defineProperty(f.document.metadataPreferences, "documentTitle", {
+    get: () => title,
+    set: (value: string) => {
+      if (value === "") throw new Error("Invalid value for documentTitle.");
+      title = value;
+    },
+  });
+  const report = run(f.app, { scope: "document", cleanup: true, seed: 14 });
+  assert.equal(title, "Untitled");
+  assert.equal(f.document.metadataPreferences.author, "");
+  assert.equal(report.cleanup?.documentInfo, true);
+  assert.deepEqual(report.errors, []);
+});
+
 test("cleanup is off by default and works on its own", () => {
   const f = deck();
   const link = f.document.link("https://brindlewick.invalid/", "https://brindlewick.invalid/");
@@ -555,4 +588,14 @@ test("word lists and address detection", () => {
     assert.equal(looksLikeAddress(address), true, address);
   }
   for (const name of ["Annual Review", "Chapter 1. Overview", "Q3 results"]) assert.equal(looksLikeAddress(name), false, name);
+});
+
+test("enum values match by name, since UXP hands out a new object for every read", () => {
+  assert.notEqual(VariableTypes.CUSTOM_TEXT_TYPE, VariableTypes.CUSTOM_TEXT_TYPE, "fixture: like UXP");
+  assert.ok(Number.isNaN(Number(VariableTypes.CUSTOM_TEXT_TYPE)), "fixture: like UXP");
+  assert.ok(sameEnum(VariableTypes.CUSTOM_TEXT_TYPE, VariableTypes.CUSTOM_TEXT_TYPE));
+  assert.ok(!sameEnum(VariableTypes.CUSTOM_TEXT_TYPE, VariableTypes.FILE_NAME_TYPE));
+  assert.ok(sameEnum(1131705460, 1131705460), "ExtendScript numbers");
+  assert.ok(!sameEnum({}, {}), "two unrelated objects are not the same enum");
+  assert.ok(!sameEnum(null, undefined));
 });

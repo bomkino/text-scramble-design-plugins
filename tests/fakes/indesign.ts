@@ -22,6 +22,11 @@ export class World {
   }
 }
 
+/** The same object, reached by index: everything reads and writes through, but toSpecifier() differs. */
+function byIndex<T extends object>(item: T, spec: string): T {
+  return new Proxy(item, { get: (target, key) => (key === "toSpecifier" ? () => spec : Reflect.get(target, key)) });
+}
+
 export class Collection<T> {
   constructor(private readonly items: () => T[]) {}
   get length(): number {
@@ -614,10 +619,23 @@ export class Bookmark extends Named {
   }
 }
 
+/**
+ * Like UXP, every read of an enum value is a new object: === and == are false between two reads, and
+ * Number() is NaN. Only String() gives the name. (ExtendScript uses plain numbers instead.)
+ */
+export class EnumValue {
+  constructor(readonly enumName: string) {}
+  toString(): string {
+    return this.enumName;
+  }
+}
+
 export class TextVariable {
   readonly isValid = true;
   readonly variableOptions: { contents: string };
-  constructor(world: World, readonly name: string, readonly variableType: string, contents: string) {
+  private readonly typeName: string;
+  constructor(world: World, readonly name: string, variableType: unknown, contents: string) {
+    this.typeName = String(variableType);
     let value = contents;
     this.variableOptions = {
       get contents() {
@@ -629,9 +647,19 @@ export class TextVariable {
       },
     };
   }
+  get variableType(): EnumValue {
+    return new EnumValue(this.typeName);
+  }
 }
 
-export const VariableTypes = { CUSTOM_TEXT_TYPE: "CUSTOM_TEXT_TYPE", FILE_NAME_TYPE: "FILE_NAME_TYPE" } as const;
+export const VariableTypes = {
+  get CUSTOM_TEXT_TYPE() {
+    return new EnumValue("CUSTOM_TEXT_TYPE");
+  },
+  get FILE_NAME_TYPE() {
+    return new EnumValue("FILE_NAME_TYPE");
+  },
+};
 
 export class Document {
   readonly isValid = true;
@@ -668,13 +696,26 @@ export class Document {
     for (const key of Object.keys(fields)) {
       Object.defineProperty(this.metadataPreferences, key, {
         enumerable: true,
+        configurable: true,
         get: () => fields[key],
         set: (value) => {
           world.assertInScript("Document info");
+          // Like InDesign 2026, an empty title is quietly ignored.
+          if (key === "documentTitle" && value === "") return;
           fields[key] = value;
         },
       });
     }
+    // The XMP route does clear the title: setProperty(Dublin Core, "title[1]", "").
+    const xmpFields: Record<string, string> = { "title[1]": "documentTitle", "description[1]": "description", "rights[1]": "copyrightNotice" };
+    Object.defineProperty(this.metadataPreferences, "setProperty", {
+      enumerable: false,
+      value: (namespace: string, path: string, value: string) => {
+        world.assertInScript("Document info");
+        if (namespace !== "http://purl.org/dc/elements/1.1/" || !(path in xmpFields)) throw new Error(`Unknown XMP property ${path}.`);
+        fields[xmpFields[path]] = value;
+      },
+    });
     this.basicParagraph = this.paragraphStyle("[Basic Paragraph]");
     this.defaultLayer = this.layer("Layer 1");
   }
@@ -761,7 +802,7 @@ export class Document {
     siblings.push(bookmark);
     return bookmark;
   }
-  variable(name: string, contents: string, type: string = VariableTypes.CUSTOM_TEXT_TYPE): TextVariable {
+  variable(name: string, contents: string, type: unknown = VariableTypes.CUSTOM_TEXT_TYPE): TextVariable {
     const variable = new TextVariable(this.world, name, type, contents);
     this.variables.push(variable);
     return variable;
@@ -782,8 +823,16 @@ export class Document {
   }
 
   // The DOM surface Text Scramble reads.
+  /**
+   * Like InDesign, document.stories.item(i) names the story by its index ("/document/story[0]"), while
+   * frame.parentStory names the same story by its id. Code that dedupes by specifier sees two stories.
+   */
   get stories(): Collection<Story> {
-    return new Collection(() => this.storyList.filter((story) => !this.unlistedStories.has(story)));
+    return new Collection(() =>
+      this.storyList
+        .filter((story) => !this.unlistedStories.has(story))
+        .map((story, index) => byIndex(story, `/document/story[${index}]`)),
+    );
   }
   get pages(): Collection<Page> {
     return new Collection(() => this.spreads.flatMap((spread) => spread.pages));
