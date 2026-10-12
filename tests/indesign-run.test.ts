@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { looksLikeAddress } from "../plugins/indesign/src/cleanup";
+import { looksLikeAddress, sameEnum } from "../plugins/indesign/src/cleanup";
 import { keepPlan, parseWordList } from "../plugins/indesign/src/keep-readable";
 import { inspectScope, paragraphStyleNames, revealItem, runScramble, type RunOptions } from "../plugins/indesign/src/run";
 import { estimateVisualWidth } from "../packages/core/src/scramble-text";
@@ -588,4 +588,14 @@ test("word lists and address detection", () => {
     assert.equal(looksLikeAddress(address), true, address);
   }
   for (const name of ["Annual Review", "Chapter 1. Overview", "Q3 results"]) assert.equal(looksLikeAddress(name), false, name);
+});
+
+test("enum values match by name, since UXP hands out a new object for every read", () => {
+  assert.notEqual(VariableTypes.CUSTOM_TEXT_TYPE, VariableTypes.CUSTOM_TEXT_TYPE, "fixture: like UXP");
+  assert.ok(Number.isNaN(Number(VariableTypes.CUSTOM_TEXT_TYPE)), "fixture: like UXP");
+  assert.ok(sameEnum(VariableTypes.CUSTOM_TEXT_TYPE, VariableTypes.CUSTOM_TEXT_TYPE));
+  assert.ok(!sameEnum(VariableTypes.CUSTOM_TEXT_TYPE, VariableTypes.FILE_NAME_TYPE));
+  assert.ok(sameEnum(1131705460, 1131705460), "ExtendScript numbers");
+  assert.ok(!sameEnum({}, {}), "two unrelated objects are not the same enum");
+  assert.ok(!sameEnum(null, undefined));
 });

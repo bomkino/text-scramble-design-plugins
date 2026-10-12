@@ -619,10 +619,23 @@ export class Bookmark extends Named {
   }
 }
 
+/**
+ * Like UXP, every read of an enum value is a new object: === and == are false between two reads, and
+ * Number() is NaN. Only String() gives the name. (ExtendScript uses plain numbers instead.)
+ */
+export class EnumValue {
+  constructor(readonly enumName: string) {}
+  toString(): string {
+    return this.enumName;
+  }
+}
+
 export class TextVariable {
   readonly isValid = true;
   readonly variableOptions: { contents: string };
-  constructor(world: World, readonly name: string, readonly variableType: string, contents: string) {
+  private readonly typeName: string;
+  constructor(world: World, readonly name: string, variableType: unknown, contents: string) {
+    this.typeName = String(variableType);
     let value = contents;
     this.variableOptions = {
       get contents() {
@@ -634,9 +647,19 @@ export class TextVariable {
       },
     };
   }
+  get variableType(): EnumValue {
+    return new EnumValue(this.typeName);
+  }
 }
 
-export const VariableTypes = { CUSTOM_TEXT_TYPE: "CUSTOM_TEXT_TYPE", FILE_NAME_TYPE: "FILE_NAME_TYPE" } as const;
+export const VariableTypes = {
+  get CUSTOM_TEXT_TYPE() {
+    return new EnumValue("CUSTOM_TEXT_TYPE");
+  },
+  get FILE_NAME_TYPE() {
+    return new EnumValue("FILE_NAME_TYPE");
+  },
+};
 
 export class Document {
   readonly isValid = true;
@@ -779,7 +802,7 @@ export class Document {
     siblings.push(bookmark);
     return bookmark;
   }
-  variable(name: string, contents: string, type: string = VariableTypes.CUSTOM_TEXT_TYPE): TextVariable {
+  variable(name: string, contents: string, type: unknown = VariableTypes.CUSTOM_TEXT_TYPE): TextVariable {
     const variable = new TextVariable(this.world, name, type, contents);
     this.variables.push(variable);
     return variable;

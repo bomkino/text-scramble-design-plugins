@@ -239,8 +239,14 @@
     }
 
     // InDesign enumerations can come back as objects that only compare equal with ==.
+    // ExtendScript enum values are numbers, but UXP hands out a new object for every read, so compare
+    // by name as the panel does.
     function sameEnum(left, right) {
-      return left == right;
+      var name;
+      if (left === right) return true;
+      if (left === null || left === undefined || right === null || right === undefined) return false;
+      name = String(left);
+      return name === String(right) && !/^\[object/.test(name);
     }
 
     function customTextType() {

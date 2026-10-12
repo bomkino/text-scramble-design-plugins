@@ -44,6 +44,17 @@ function bookmarksOf(owner: any): any[] {
   return collectionItems(read(() => owner.bookmarks, null)).flatMap((bookmark) => [bookmark, ...bookmarksOf(bookmark)]);
 }
 
+/**
+ * True when two InDesign enum values are the same. UXP hands out a new object for every read, so === and ==
+ * are false and Number() is NaN; String() gives the enum's name. ExtendScript uses numbers.
+ */
+export function sameEnum(left: unknown, right: unknown): boolean {
+  if (left === right) return true;
+  if (left === null || left === undefined || right === null || right === undefined) return false;
+  const name = String(left);
+  return name === String(right) && !name.startsWith("[object");
+}
+
 /** Names that appear in an exported PDF, plus custom text variables. Scrambled in Whole document runs. */
 export function documentNames(document: any, customTextType: unknown): NamedText[] {
   const names: NamedText[] = [];
@@ -56,7 +67,7 @@ export function documentNames(document: any, customTextType: unknown): NamedText
   collectionItems(read(() => document.hyperlinkTextDestinations, null)).forEach((anchor) => addName(anchor, "anchor"));
   if (customTextType !== undefined) {
     collectionItems(read(() => document.textVariables, null)).forEach((variable) => {
-      if (read(() => variable.variableType, null) !== customTextType) return;
+      if (!sameEnum(read(() => variable.variableType, null), customTextType)) return;
       const options = read(() => variable.variableOptions, null);
       const contents = read(() => options.contents, null);
       if (typeof contents !== "string" || !contents.trim() || looksLikeAddress(contents)) return;
